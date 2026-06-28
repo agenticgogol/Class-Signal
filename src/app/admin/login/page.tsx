@@ -16,7 +16,7 @@ export default async function AdminLoginPage({
   const params = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  if (data?.claims && params.reauth !== "1") redirect("/admin/dashboard");
+  if (data?.claims && params.reauth !== "1") redirect("/admin/questions");
 
   return (
     <div className="admin-login-page">

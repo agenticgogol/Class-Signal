@@ -1,7 +1,8 @@
-import { ArrowLeft, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { logout } from "@/app/admin/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AdminShell({ children, email }: { children: React.ReactNode; email?: string }) {
   return (
@@ -17,13 +18,17 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
           </div>
           <div className="admin-sidebar__label">Workspace</div>
           <nav aria-label="Admin navigation">
-            <Link href="/admin/dashboard"><LayoutDashboard size={17} /> Dashboard</Link>
             <Link href="/admin/questions"><MessageSquareText size={17} /> Answer questions</Link>
+            <Link href="/admin/dashboard"><LayoutDashboard size={17} /> Dashboard</Link>
           </nav>
           <div className="admin-sidebar__label">Configuration</div>
-          <nav aria-label="Admin configuration"><Link href="/admin/settings"><Settings size={17} /> Settings</Link></nav>
+          <nav aria-label="Admin configuration">
+            <Link href="/admin/knowledge"><BookOpen size={17} /> FAQ &amp; Theory</Link>
+            <Link href="/admin/settings"><Settings size={17} /> Settings</Link>
+          </nav>
         </div>
         <div className="admin-account">
+          <ThemeToggle />
           {email && <span title={email}><ShieldCheck size={13} /> {email}</span>}
           <form action={logout}>
             <button type="submit"><LogOut size={15} /> Sign out</button>

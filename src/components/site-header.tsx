@@ -1,5 +1,6 @@
 import { LockKeyhole, MessageCircleQuestion } from "lucide-react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
   return (
@@ -12,10 +13,10 @@ export function SiteHeader() {
           <span>ClassSignal</span>
         </Link>
         <nav className="site-nav" aria-label="Primary navigation"><Link href="/questions">Public Board</Link></nav>
-        <Link className="site-header__admin" href="/admin/login?reauth=1">
+        <div className="site-header__actions"><ThemeToggle /><Link className="site-header__admin" href="/admin/questions">
           <LockKeyhole size={15} aria-hidden="true" />
           <span>Admin Login</span>
-        </Link>
+        </Link></div>
       </div>
     </header>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CheckCircle2, ClipboardCopy, Edit3, Eye, EyeOff, Search, Sparkles } from "lucide-react";
+import { Bot, CheckCircle2, ClipboardCopy, Edit3, Eye, EyeOff, GitCompareArrows, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -11,9 +11,11 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   questionStatuses,
+  questionStatusLabel,
   type AdminQuestion,
   type DuplicateQuestionOption,
   type SimilarQuestionsBySource,
+  type SimilarQuestion,
 } from "@/lib/questions/admin-types";
 
 type QueueView = "needs_answer" | "all" | "follow_up";
@@ -127,6 +129,8 @@ function AnswerComposer({
   const [isPublic, setIsPublic] = useState(question.is_public);
   const [isAnswerPublic, setIsAnswerPublic] = useState(question.is_answer_public);
   const [aiDraft, setAiDraft] = useState(question.ai_draft_answer ?? "");
+  const [duplicates, setDuplicates] = useState<SimilarQuestion[]>([]);
+  const [findingDuplicates, setFindingDuplicates] = useState(false);
   const [state, setState] = useState<{ saving: boolean; generating: boolean; message?: string; error?: string }>({ saving: false, generating: false });
 
   async function save(markAnswered: boolean) {
@@ -178,6 +182,24 @@ function AnswerComposer({
     }
   }
 
+  async function findDuplicates() {
+    setFindingDuplicates(true); setState({ saving: false, generating: false });
+    try {
+      const response = await fetch(`/api/admin/questions/${question.id}/find-duplicates`, { method: "POST" });
+      const result = await response.json() as { matches?: SimilarQuestion[]; message?: string; ai_warning?: string };
+      if (!response.ok) { setState({ saving: false, generating: false, error: result.message ?? "Duplicate search failed." }); setFindingDuplicates(false); return; }
+      setDuplicates(result.matches ?? []); setFindingDuplicates(false); setState({ saving: false, generating: false, message: result.ai_warning ?? result.message });
+    } catch { setFindingDuplicates(false); setState({ saving: false, generating: false, error: "Duplicate search could not be reached." }); }
+  }
+
+  async function markDuplicate(candidate: SimilarQuestion) {
+    const response = await fetch(`/api/admin/questions/${question.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "Duplicate", duplicate_of_question_id: candidate.id }) });
+    const result = await response.json() as { question?: { updated_at: string }; message?: string };
+    if (!response.ok) { setState({ saving: false, generating: false, error: result.message ?? "Question could not be marked duplicate." }); return; }
+    setStatus("Duplicate"); onUpdated({ ...question, status: "Duplicate", duplicate_of_question_id: candidate.id, updated_at: result.question?.updated_at ?? question.updated_at });
+    setState({ saving: false, generating: false, message: "Question marked as a duplicate." });
+  }
+
   return (
     <div className="answer-composer">
       <header className="answer-composer__header">
@@ -189,15 +211,17 @@ function AnswerComposer({
 
       <div className="answer-composer__toolbar">
         <Button type="button" variant="secondary" onClick={generateDraft} disabled={state.generating}><Sparkles size={15} /> {state.generating ? "Generating…" : "Generate AI draft"}</Button>
+        <Button type="button" variant="secondary" onClick={findDuplicates} disabled={findingDuplicates}><GitCompareArrows size={15} /> {findingDuplicates ? "Comparing…" : "Find duplicates"}</Button>
         {aiDraft && <button type="button" onClick={() => { setAnswer(aiDraft); setState({ saving: false, generating: false, message: "AI draft copied. Review and publish when ready." }); }}><ClipboardCopy size={14} /> Copy draft into answer</button>}
       </div>
       {aiDraft && <details className="answer-composer__ai"><summary><Bot size={14} /> Review AI draft</summary><div>{aiDraft}</div></details>}
+      {duplicates.length > 0 && <section className="duplicate-results"><header><GitCompareArrows size={16} /><strong>Possible duplicates</strong></header>{duplicates.map((candidate) => <article key={candidate.id}><div><strong>{Math.round(candidate.similarity_score * 100)}% match</strong><p>{candidate.question_text}</p>{candidate.similarity_reason && <small>{candidate.similarity_reason}</small>}</div><Button variant="secondary" onClick={() => void markDuplicate(candidate)}>Mark duplicate</Button></article>)}</section>}
 
       <label className="answer-composer__field">Instructor answer <span>Markdown supported</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} rows={12} placeholder="Write a clear, concise answer for the student…" /></label>
       <label className="answer-composer__field">Reference links <span>Optional</span><textarea value={references} onChange={(event) => setReferences(event.target.value)} rows={3} placeholder="Add useful references or documentation links…" /></label>
 
       <div className="answer-composer__options">
-        <label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}>{questionStatuses.map((option) => <option key={option}>{option}</option>)}</select></label>
+        <label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}>{questionStatuses.map((option) => <option key={option} value={option}>{questionStatusLabel(option)}</option>)}</select></label>
         <label className="answer-toggle"><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} /> {isPublic ? <Eye size={15} /> : <EyeOff size={15} />} Show question publicly</label>
         <label className="answer-toggle"><input type="checkbox" checked={isAnswerPublic} onChange={(event) => setIsAnswerPublic(event.target.checked)} /> {isAnswerPublic ? <Eye size={15} /> : <EyeOff size={15} />} Show answer publicly</label>
       </div>

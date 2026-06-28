@@ -1,17 +1,19 @@
 "use client";
 
-import { CheckCircle2, Send } from "lucide-react";
+import { BookOpen, CheckCircle2, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { KnowledgeHtml } from "@/components/knowledge-html";
 import { questionLimits } from "@/lib/questions/validation";
+import type { KnowledgeSuggestion } from "@/lib/knowledge/types";
 
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "error"; message: string; errors: Record<string, string> }
-  | { status: "success" };
+  | { status: "success"; questionId: string; email: string; suggestion: KnowledgeSuggestion | null; response?: string; responding?: boolean };
 
 export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: string; onSubmitted?: () => void }) {
   const [state, setState] = useState<SubmitState>({ status: "idle" });
@@ -22,7 +24,7 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
     setState({ status: "submitting" });
 
     const form = event.currentTarget;
-    const payload = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode };
+    const payload: Record<string, FormDataEntryValue | string> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode };
 
     try {
       const response = await fetch("/api/questions", {
@@ -31,6 +33,8 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
         body: JSON.stringify(payload),
       });
       const result = (await response.json()) as {
+        id?: string;
+        suggestion?: KnowledgeSuggestion | null;
         message?: string;
         errors?: Record<string, string>;
       };
@@ -44,8 +48,9 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
         return;
       }
 
+      const email = String(payload.student_email ?? "").trim();
       form.reset();
-      setState({ status: "success" });
+      setState({ status: "success", questionId: result.id ?? "", email, suggestion: result.suggestion ?? null });
     } catch {
       setState({
         status: "error",
@@ -56,13 +61,35 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
   }
 
   if (state.status === "success") {
+    const submitted = state;
+    async function respondToSuggestion(decision: "accepted" | "rejected") {
+      if (!submitted.suggestion) return;
+      setState({ ...submitted, responding: true });
+      try {
+        const response = await fetch("/api/questions/suggestion-feedback", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question_id: submitted.questionId, suggestion_id: submitted.suggestion.id, participant_email: submitted.email, decision, access_code: accessCode }),
+        });
+        const result = await response.json() as { message?: string };
+        if (!response.ok) { setState({ ...submitted, responding: false, response: result.message ?? "Your response could not be saved." }); return; }
+        setState({ ...submitted, responding: false, suggestion: null, response: result.message });
+      } catch { setState({ ...submitted, responding: false, response: "Your response could not be saved." }); }
+    }
     return (
       <div className="success-panel" role="status">
         <span className="success-panel__icon" aria-hidden="true">
           <CheckCircle2 size={30} />
         </span>
         <h2>Your question is in the queue.</h2>
-        <p>The instructor can now review it without interrupting the lesson. You can check progress on the public board or look it up later with the same email.</p>
+        <p>The instructor can review it without interrupting the lesson.</p>
+        {state.suggestion && <section className="knowledge-suggestion">
+          <div className="knowledge-suggestion__label"><BookOpen size={16} /> Pulled from {state.suggestion.kind === "faq" ? "FAQ" : "Theory"}</div>
+          <h3>{state.suggestion.title}</h3>
+          <KnowledgeHtml html={state.suggestion.content_html} />
+          <p>Does this answer your question?</p>
+          <div><Button disabled={state.responding} onClick={() => void respondToSuggestion("accepted")}><ThumbsUp size={15} /> Yes, this answers it</Button><Button disabled={state.responding} variant="secondary" onClick={() => void respondToSuggestion("rejected")}><ThumbsDown size={15} /> I still need the instructor</Button></div>
+        </section>}
+        {state.response && <p className="form-alert" role="status">{state.response}</p>}
         <div className="success-panel__actions">
           {onSubmitted && <Button onClick={onSubmitted}>Return to board</Button>}
           <Button variant="secondary" onClick={() => setState({ status: "idle" })}>

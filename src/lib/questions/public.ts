@@ -63,6 +63,7 @@ export async function getPublicQuestions(
       module_topic: row.module_topic,
       status: row.status,
       answer_markdown: row.is_answer_public ? row.answer_markdown : null,
+      answer_source: "instructor" as const,
       reference_links: row.is_answer_public ? row.reference_links : null,
       created_at: row.created_at,
       upvote_count: row.question_votes?.[0]?.count ?? 0,

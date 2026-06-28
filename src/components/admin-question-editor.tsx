@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   questionPriorities,
   questionStatuses,
+  questionStatusLabel,
   type AdminQuestion,
   type DuplicateQuestionOption,
   type SimilarQuestion,
@@ -206,7 +207,7 @@ export function AdminQuestionEditor({
 
           <form className="admin-editor-form" onSubmit={saveQuestion}>
             <div className="admin-editor-row">
-              <label>Status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)}>{questionStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select></label>
+              <label>Status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)}>{questionStatuses.map((statusOption) => <option key={statusOption} value={statusOption}>{questionStatusLabel(statusOption)}</option>)}</select></label>
               <label>Priority<select name="priority" defaultValue={question.priority}>{questionPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>
             </div>
             <label className="admin-check"><input name="is_public" type="checkbox" defaultChecked={question.is_public} /> {question.is_public ? <Eye size={16} /> : <EyeOff size={16} />} Publicly visible</label>

@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem('classsignal-theme');document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}` }} /></head>
       <body>
         <SiteHeader />
         <main className="site-main">{children}</main>
@@ -25,12 +26,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </div>
             <div className="site-footer__links" aria-label="Footer navigation">
               <Link href="/questions">Public Board</Link>
-              <Link href="/admin/login?reauth=1">Admin Login</Link>
+              <Link href="/admin/questions">Admin Login</Link>
             </div>
             <Card className="site-footer__card">
               <div className="site-footer__eyebrow">For instructors</div>
               <p>Turn classroom questions into clear answers, visible progress, and actionable teaching signals.</p>
-              <Link href="/admin/login?reauth=1">Admin Login</Link>
+              <Link href="/admin/questions">Admin Login</Link>
             </Card>
           </div>
           <div className="shell site-footer__copyright">

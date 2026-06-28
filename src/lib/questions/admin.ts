@@ -65,6 +65,7 @@ export async function getAdminQuestions(filters: AdminQuestionFilters): Promise<
     status: row.status,
     priority: row.priority,
     answer_markdown: row.answer_markdown,
+    answer_source: "instructor" as const,
     reference_links: row.reference_links,
     admin_notes: row.admin_notes,
     ai_draft_answer: row.ai_draft_answer,

@@ -1,6 +1,7 @@
 import { normalizeQuestionText, validateQuestionSubmission } from "@/lib/questions/validation";
 import { studentAccessErrorResponse, validateStudentAccess } from "@/lib/public-settings/access";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { findKnowledgeSuggestion } from "@/lib/knowledge/similarity";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -59,7 +60,17 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ id: data.id, message: "Question submitted." }, { status: 201 });
+    let savedSuggestion = null;
+    const match = await findKnowledgeSuggestion(question.question_text);
+    if (match) {
+      const { data: suggestion, error: suggestionError } = await supabase.from("question_knowledge_suggestions").insert({
+        question_id: data.id,
+        entry_id: match.entryId,
+        similarity_score: match.similarity_score,
+      }).select("id").single();
+      if (!suggestionError && suggestion) savedSuggestion = { ...match, id: suggestion.id };
+    }
+    return Response.json({ id: data.id, suggestion: savedSuggestion, message: "Question submitted." }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.name === "StudentAccessError") {
       return studentAccessErrorResponse(error);

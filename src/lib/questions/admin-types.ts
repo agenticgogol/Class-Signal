@@ -16,6 +16,7 @@ export const answeredStateOptions = ["answered", "unanswered"] as const;
 export const visibilityOptions = ["public", "private"] as const;
 export const aiDraftStateOptions = ["has_ai_draft", "no_ai_draft"] as const;
 export const duplicateStateOptions = ["duplicate", "not_duplicate"] as const;
+export const questionStatusLabel = (status: string) => status === "Will discuss later" ? "Will be discussed later" : status === "Out of scope" ? "Out of course scope" : status;
 
 export type QuestionStatus = (typeof questionStatuses)[number];
 export type QuestionPriority = (typeof questionPriorities)[number];
@@ -51,6 +52,7 @@ export type AdminQuestion = {
   reference_links: string | null;
   admin_notes: string | null;
   ai_draft_answer: string | null;
+  answer_source: "instructor" | "knowledge";
   is_answer_public: boolean;
   is_public: boolean;
   duplicate_of_question_id: string | null;

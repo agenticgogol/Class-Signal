@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { CalendarDays, CheckCircle2, Clock3, Layers3 } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronDown, Clock3, Layers3 } from "lucide-react";
 
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { StatusBadge } from "@/components/status-badge";
@@ -57,11 +57,12 @@ export function PublicQuestionBoard({
                 : <span className="voting-disabled">Voting is disabled</span>}
             </div>
             {question.answer_markdown ? (
-              <section className="public-answer" aria-label="Instructor answer">
-                <div className="public-answer__heading"><span><CheckCircle2 size={15} /> Instructor answer</span><small>Published</small></div>
-                <MarkdownPreview>{question.answer_markdown}</MarkdownPreview>
-                {question.reference_links && <div className="public-answer__references"><strong>References</strong><MarkdownPreview>{question.reference_links}</MarkdownPreview></div>}
-              </section>
+              <details className="public-answer">
+                <summary><span><CheckCircle2 size={15} /> {question.answer_source === "knowledge" ? "Pulled from course FAQ / Theory" : "Instructor answer"}</span><span>View answer <ChevronDown size={15} /></span></summary>
+                <div className="public-answer__content"><MarkdownPreview>{question.answer_markdown}</MarkdownPreview>
+                  {question.reference_links && <div className="public-answer__references"><strong>References</strong><MarkdownPreview>{question.reference_links}</MarkdownPreview></div>}
+                </div>
+              </details>
             ) : (
               <div className="public-answer-pending"><Clock3 size={14} /><span>{question.status === "Answered" ? "The instructor has answered this question, but the written answer is not public." : "Awaiting an instructor answer."}</span></div>
             )}

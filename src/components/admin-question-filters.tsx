@@ -5,6 +5,7 @@ import {
   feedbackPresenceOptions,
   questionPriorities,
   questionStatuses,
+  questionStatusLabel,
   satisfactionStatuses,
   type AdminQuestionFilters as Filters,
 } from "@/lib/questions/admin-types";
@@ -35,7 +36,7 @@ export function AdminQuestionFilters({ filters }: { filters: Filters }) {
         />
       </div>
       <div className="admin-filter-grid admin-filter-grid--quick">
-        <label>Status<select name="status" defaultValue={filters.status ?? ""}><option value="">All statuses</option>{questionStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+        <label>Status<select name="status" defaultValue={filters.status ?? ""}><option value="">All statuses</option>{questionStatuses.map((status) => <option key={status} value={status}>{questionStatusLabel(status)}</option>)}</select></label>
         <label>Priority<select name="priority" defaultValue={filters.priority ?? ""}><option value="">All priorities</option>{questionPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>
         <label>Answer state<select name="answered_state" defaultValue={filters.answered_state ?? ""}><option value="">Any answer state</option><option value="answered">Answered</option><option value="unanswered">Unanswered</option></select></label>
         <label>Satisfaction<select name="satisfaction_status" defaultValue={filters.satisfaction_status ?? ""}><option value="">Any satisfaction</option>{satisfactionStatuses.map((status) => <option key={status} value={status}>{status === "satisfied" ? "Satisfied" : "Not satisfied"}</option>)}</select></label>

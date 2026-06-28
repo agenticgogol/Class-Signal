@@ -45,8 +45,7 @@ export async function updateSession(request: NextRequest) {
   supabaseResponse.headers.set("Cache-Control", "private, no-store");
   const isAuthenticated = Boolean(data?.claims);
   const pathname = request.nextUrl.pathname;
-  const isProtectedRoute =
-    pathname.startsWith("/admin/dashboard") || pathname.startsWith("/admin/settings");
+  const isProtectedRoute = pathname.startsWith("/admin/") && pathname !== "/admin/login";
 
   if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = request.nextUrl.clone();
@@ -56,10 +55,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname === "/admin/login" && isAuthenticated) {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/admin/dashboard";
-    dashboardUrl.search = "";
-    return redirectWithCookies(dashboardUrl, supabaseResponse);
+    const answerUrl = request.nextUrl.clone();
+    answerUrl.pathname = "/admin/questions";
+    answerUrl.search = "";
+    return redirectWithCookies(answerUrl, supabaseResponse);
   }
 
   return supabaseResponse;

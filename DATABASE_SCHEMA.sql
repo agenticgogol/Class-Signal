@@ -16,6 +16,7 @@ create table if not exists public.questions (
   reference_links text,
   admin_notes text,
   ai_draft_answer text,
+  answer_source text not null default 'instructor' check (answer_source in ('instructor', 'knowledge')),
   is_answer_public boolean not null default true,
   is_public boolean not null default true,
   duplicate_of_question_id uuid references public.questions(id),
@@ -79,6 +80,50 @@ create table if not exists public.question_feedback (
   unique(question_id, participant_email)
 );
 
+create table if not exists public.knowledge_documents (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  kind text not null check (kind in ('faq', 'theory')),
+  source_filename text,
+  module_topic text,
+  is_visible boolean not null default false,
+  document_key text not null,
+  version_number integer not null default 1,
+  is_current boolean not null default true,
+  supersedes_document_id uuid references public.knowledge_documents(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.knowledge_entries (
+  id uuid primary key default gen_random_uuid(),
+  document_id uuid not null references public.knowledge_documents(id) on delete cascade,
+  section_key text,
+  title text not null,
+  module_topic text,
+  content_html text not null,
+  content_text text not null,
+  normalized_text text not null,
+  is_visible boolean not null default true,
+  sequence_number integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.question_knowledge_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid not null references public.questions(id) on delete cascade,
+  entry_id uuid not null references public.knowledge_entries(id) on delete cascade,
+  similarity_score numeric not null check (similarity_score >= 0 and similarity_score <= 1),
+  suggestion_status text not null default 'pending' check (suggestion_status in ('pending', 'accepted', 'rejected')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(question_id, entry_id)
+);
+
+create unique index if not exists one_current_knowledge_document on public.knowledge_documents(document_key) where is_current = true;
+create index if not exists knowledge_entries_sequence_idx on public.knowledge_entries(document_id, sequence_number);
+
 create unique index if not exists one_active_public_settings
 on public.public_settings (is_active)
 where is_active = true;
@@ -89,6 +134,9 @@ alter table public.question_similarity enable row level security;
 alter table public.admin_ai_settings enable row level security;
 alter table public.public_settings enable row level security;
 alter table public.question_feedback enable row level security;
+alter table public.knowledge_documents enable row level security;
+alter table public.knowledge_entries enable row level security;
+alter table public.question_knowledge_suggestions enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger as $$
@@ -116,6 +164,18 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_question_feedback_updated_at on public.question_feedback;
 create trigger set_question_feedback_updated_at
 before update on public.question_feedback
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_knowledge_documents_updated_at on public.knowledge_documents;
+create trigger set_knowledge_documents_updated_at before update on public.knowledge_documents
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_knowledge_entries_updated_at on public.knowledge_entries;
+create trigger set_knowledge_entries_updated_at before update on public.knowledge_entries
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_question_knowledge_suggestions_updated_at on public.question_knowledge_suggestions;
+create trigger set_question_knowledge_suggestions_updated_at before update on public.question_knowledge_suggestions
 for each row execute function public.set_updated_at();
 
 -- Student/public policies
@@ -177,3 +237,13 @@ for all
 to authenticated
 using (true)
 with check (true);
+
+drop policy if exists "Authenticated admin can manage knowledge documents" on public.knowledge_documents;
+create policy "Authenticated admin can manage knowledge documents"
+on public.knowledge_documents for all to authenticated using (true) with check (true);
+drop policy if exists "Authenticated admin can manage knowledge entries" on public.knowledge_entries;
+create policy "Authenticated admin can manage knowledge entries"
+on public.knowledge_entries for all to authenticated using (true) with check (true);
+drop policy if exists "Authenticated admin can manage knowledge suggestions" on public.question_knowledge_suggestions;
+create policy "Authenticated admin can manage knowledge suggestions"
+on public.question_knowledge_suggestions for all to authenticated using (true) with check (true);

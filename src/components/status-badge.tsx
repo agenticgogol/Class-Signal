@@ -6,9 +6,10 @@ const statusClassNames: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const label = status === "Will discuss later" ? "Will be discussed later" : status === "Out of scope" ? "Out of course scope" : status;
   return (
     <span className={`status-badge ${statusClassNames[status] ?? "status-badge--new"}`}>
-      {status}
+      {label}
     </span>
   );
 }

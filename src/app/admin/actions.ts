@@ -28,7 +28,7 @@ export async function login(_previousState: LoginState, formData: FormData): Pro
     return { message: "Authentication is temporarily unavailable." };
   }
 
-  redirect("/admin/dashboard");
+  redirect("/admin/questions");
 }
 
 export async function logout() {
