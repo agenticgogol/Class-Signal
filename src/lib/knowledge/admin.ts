@@ -14,7 +14,7 @@ export async function getKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
   const supabase = await authenticatedClient();
   const { data, error } = await supabase
     .from("knowledge_documents")
-    .select("id, title, kind, source_filename, module_topic, is_visible, document_key, version_number, is_current, supersedes_document_id, created_at, updated_at, knowledge_entries(id, title, module_topic, is_visible, sequence_number, created_at)")
+    .select("id, title, kind, source_filename, module_topic, is_visible, document_key, version_number, is_current, supersedes_document_id, created_at, updated_at, knowledge_entries(id, title, module_topic, is_visible, sequence_number, provenance_label, created_at)")
     .order("created_at", { ascending: false });
   if (error) {
     if (error.code === "PGRST205" || error.code === "42P01") return [];

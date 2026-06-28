@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CheckCircle2, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import { BookOpen, CheckCircle2, ExternalLink, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ type SubmitState =
   | { status: "error"; message: string; errors: Record<string, string> }
   | { status: "success"; questionId: string; email: string; suggestion: KnowledgeSuggestion | null; response?: string; responding?: boolean };
 
-export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: string; onSubmitted?: () => void }) {
+export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }: { accessCode: string; publicSessionId?: string | null; onSubmitted?: () => void }) {
   const [state, setState] = useState<SubmitState>({ status: "idle" });
   const errors = state.status === "error" ? state.errors : {};
 
@@ -25,6 +25,7 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
 
     const form = event.currentTarget;
     const payload: Record<string, FormDataEntryValue | string> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode };
+    if (publicSessionId) payload.public_session_id = publicSessionId;
 
     try {
       const response = await fetch("/api/questions", {
@@ -83,8 +84,9 @@ export function QuestionSubmitForm({ accessCode, onSubmitted }: { accessCode: st
         <h2>Your question is in the queue.</h2>
         <p>The instructor can review it without interrupting the lesson.</p>
         {state.suggestion && <section className="knowledge-suggestion">
-          <div className="knowledge-suggestion__label"><BookOpen size={16} /> Pulled from {state.suggestion.kind === "faq" ? "FAQ" : "Theory"}</div>
+          <div className="knowledge-suggestion__label"><BookOpen size={16} /> Pulled from {state.suggestion.kind === "faq" ? "FAQ" : state.suggestion.kind === "theory" ? "Theory" : "Code"}<span className={`knowledge-confidence knowledge-confidence--${state.suggestion.confidence_band}`}>{state.suggestion.confidence_band} confidence</span></div>
           <h3>{state.suggestion.title}</h3>
+          <div className="knowledge-citation"><span><strong>Source</strong>{state.suggestion.document_title}{state.suggestion.provenance_label ? ` · ${state.suggestion.provenance_label}` : ""}{state.suggestion.module_topic ? ` · ${state.suggestion.module_topic}` : ""}</span><a href={`/questions?section=knowledge&kind=${state.suggestion.kind}#knowledge-entry-${state.suggestion.entry_id}`}><ExternalLink size={14} /> Open cited section</a></div>
           <KnowledgeHtml html={state.suggestion.content_html} />
           <p>Does this answer your question?</p>
           <div><Button disabled={state.responding} onClick={() => void respondToSuggestion("accepted")}><ThumbsUp size={15} /> Yes, this answers it</Button><Button disabled={state.responding} variant="secondary" onClick={() => void respondToSuggestion("rejected")}><ThumbsDown size={15} /> I still need the instructor</Button></div>

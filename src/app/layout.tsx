@@ -22,16 +22,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <div className="shell site-footer__inner">
             <div>
               <div className="site-footer__eyebrow">ClassSignal</div>
-              <p>Every question heard. Every answer tracked. Every class more useful.</p>
+              <p>Every classroom question heard, tracked, and answered live.</p>
             </div>
             <div className="site-footer__links" aria-label="Footer navigation">
-              <Link href="/questions">Public Board</Link>
-              <Link href="/admin/questions">Admin Login</Link>
+              <Link href="/">Home</Link>
+              <Link href="/questions">Class Board</Link>
+              <Link href="/admin/questions">Instructor Login</Link>
             </div>
             <Card className="site-footer__card">
               <div className="site-footer__eyebrow">For instructors</div>
-              <p>Turn classroom questions into clear answers, visible progress, and actionable teaching signals.</p>
-              <Link href="/admin/questions">Admin Login</Link>
+              <p>AI-assisted answers, duplicate detection, and a full Q&A audit trail — all in one place.</p>
+              <Link href="/admin/questions">Instructor Login</Link>
             </Card>
           </div>
           <div className="shell site-footer__copyright">

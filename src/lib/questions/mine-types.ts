@@ -3,6 +3,7 @@ export type StudentQuestion = {
   question_text: string;
   status: string;
   answer_markdown: string | null;
+  answer_html: string | null;
   is_answer_public: boolean;
   reference_links: string | null;
   course_name: string;
@@ -11,6 +12,8 @@ export type StudentQuestion = {
   module_topic: string | null;
   created_at: string;
   feedback: StudentQuestionFeedback | null;
+  canonical_question_id: string | null;
+  canonical_question_text: string | null;
 };
 
 export type StudentQuestionFeedback = {

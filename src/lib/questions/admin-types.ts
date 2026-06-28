@@ -99,6 +99,7 @@ export type SimilarQuestion = {
   similarity_score: number;
   method: string;
   similarity_reason: string | null;
+  participant_count?: number;
 };
 
 export type SimilarQuestionsBySource = Record<string, SimilarQuestion[]>;

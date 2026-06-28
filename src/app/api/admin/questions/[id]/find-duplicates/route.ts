@@ -10,6 +10,7 @@ type QuestionRow = {
   question_text: string;
   course_name: string;
   status: string;
+  question_votes: Array<{ voter_email: string }> | null;
 };
 
 export async function POST(
@@ -29,7 +30,7 @@ export async function POST(
 
   const { data: source, error: sourceError } = await supabase
     .from("questions")
-    .select("id, question_text, course_name, status")
+    .select("id, question_text, course_name, status, question_votes(voter_email)")
     .eq("id", id)
     .maybeSingle();
   if (sourceError) {
@@ -55,6 +56,7 @@ export async function POST(
     .map((question) => ({
       ...question,
       similarity_score: jaccardSimilarity(source.question_text, question.question_text),
+      participant_count: new Set((question.question_votes ?? []).map((vote) => vote.voter_email.toLocaleLowerCase("en-US"))).size,
     }))
     .sort((left, right) => right.similarity_score - left.similarity_score)
     .slice(0, 10);
@@ -127,6 +129,7 @@ export async function POST(
         similar_question_id: candidate.id,
         similarity_score: candidate.similarity_score,
         similarity_reason: candidate.similarity_reason,
+        participant_count: candidate.participant_count,
         method: candidate.method,
       })),
     );

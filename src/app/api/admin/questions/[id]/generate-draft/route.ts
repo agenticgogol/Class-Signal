@@ -1,11 +1,13 @@
 import { getAiProvider } from "@/lib/ai";
 import { getActiveAiRuntimeSettings } from "@/lib/ai/settings";
 import { AiProviderError } from "@/lib/ai/types";
+import type { GroundingMode } from "@/lib/ai/types";
+import { retrieveCourseSources } from "@/lib/knowledge/retrieval";
 import { isQuestionId } from "@/lib/questions/admin-validation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const supabase = await createClient();
@@ -35,6 +37,22 @@ export async function POST(
   if (!question) return Response.json({ message: "Question not found." }, { status: 404 });
 
   try {
+    let body: unknown = {};
+    try { body = await request.json(); } catch { /* An empty body uses the safe default. */ }
+    const requestedMode = typeof body === "object" && body !== null && "grounding_mode" in body
+      ? (body as { grounding_mode?: unknown }).grounding_mode
+      : "course_only";
+    if (requestedMode !== "course_only" && requestedMode !== "course_and_web") {
+      return Response.json({ message: "Invalid grounding mode." }, { status: 400 });
+    }
+    const groundingMode: GroundingMode = requestedMode;
+    const courseSources = await retrieveCourseSources(question.question_text, question.module_topic);
+    if (groundingMode === "course_only" && courseSources.length === 0) {
+      return Response.json({
+        message: "No sufficiently relevant published course material was found. Publish a matching FAQ/Theory section or explicitly use Course + web.",
+      }, { status: 422 });
+    }
+
     const settings = await getActiveAiRuntimeSettings();
     if (!settings) {
       return Response.json(
@@ -44,7 +62,7 @@ export async function POST(
     }
 
     const provider = getAiProvider(settings.providerName);
-    const draft = await provider.generateDraftAnswer(
+    const result = await provider.generateDraftAnswer(
       {
         questionText: question.question_text,
         courseName: question.course_name,
@@ -52,13 +70,26 @@ export async function POST(
         classNumber: question.class_number,
         moduleTopic: question.module_topic,
         referenceLinks: question.reference_links,
+        groundingMode,
+        courseSources,
       },
       settings,
     );
 
+    if (groundingMode === "course_only") {
+      const allowedCitations = new Set(courseSources.map((source) => source.citationId));
+      const citedIds = [...result.draft.matchAll(/\[(C\d+)\]/g)].map((match) => match[1]);
+      if (citedIds.length === 0 || citedIds.some((citationId) => !allowedCitations.has(citationId))) {
+        throw new AiProviderError(
+          "The provider returned a draft without valid course citations, so it was rejected. Try again or use Course + web.",
+          502,
+        );
+      }
+    }
+
     const { error: updateError } = await supabase
       .from("questions")
-      .update({ ai_draft_answer: draft })
+      .update({ ai_draft_answer: result.draft })
       .eq("id", id);
     if (updateError) {
       console.error("AI draft persistence failed", {
@@ -69,7 +100,29 @@ export async function POST(
     }
 
     return Response.json(
-      { draft, message: "Draft answer generated." },
+      {
+        draft: result.draft,
+        grounding_mode: groundingMode,
+        confidence: courseSources.length >= 2 && courseSources[0].similarityScore >= 0.35 && (courseSources[0].semanticScore === null || Math.abs(courseSources[0].semanticScore - courseSources[0].lexicalScore) <= 0.35)
+          ? "high"
+          : courseSources[0]?.similarityScore >= 0.18 ? "medium" : "low",
+        course_sources: courseSources.map((source) => ({
+          citationId: source.citationId,
+          entryId: source.entryId,
+          kind: source.kind,
+          documentTitle: source.documentTitle,
+          sectionTitle: source.sectionTitle,
+          moduleTopic: source.moduleTopic,
+          similarityScore: source.similarityScore,
+          provenanceLabel: source.provenanceLabel,
+        })),
+        external_citations: result.externalCitations,
+        web_search_used: result.webSearchUsed,
+        warning: courseSources[0]?.similarityScore < 0.18
+          ? "Course-material coverage is weak. Verify the draft carefully before publishing."
+          : null,
+        message: result.webSearchUsed ? "Grounded draft generated with course and web sources." : "Grounded draft generated from course material.",
+      },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
@@ -82,6 +135,9 @@ export async function POST(
     }
     if (code === "SETTINGS_UNAVAILABLE") {
       return Response.json({ message: "AI settings could not be loaded." }, { status: 503 });
+    }
+    if (code === "GROUNDING_UNAVAILABLE") {
+      return Response.json({ message: "Approved course material could not be loaded." }, { status: 503 });
     }
     if (code === "API_KEY_REQUIRED") {
       return Response.json({ message: "The active AI provider has no API key. Update AI settings." }, { status: 422 });

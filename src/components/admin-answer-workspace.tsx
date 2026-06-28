@@ -1,11 +1,12 @@
 "use client";
 
-import { Bot, CheckCircle2, ClipboardCopy, Edit3, Eye, EyeOff, GitCompareArrows, Search, Sparkles } from "lucide-react";
+import { Bot, BookOpen, CheckCircle2, ClipboardCopy, Edit3, Eye, EyeOff, GitCompareArrows, Globe2, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AdminQuestionEditor } from "@/components/admin-question-editor";
 import { ExportCsvButton } from "@/components/export-csv-button";
+import { useLlmCallWarning } from "@/components/llm-call-warning";
 import { PriorityBadge } from "@/components/priority-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,9 @@ import {
 } from "@/lib/questions/admin-types";
 
 type QueueView = "needs_answer" | "all" | "follow_up";
+type GroundingMode = "course_only" | "course_and_web";
+type DraftSource = { citationId: string; entryId: string; kind: string; documentTitle: string; sectionTitle: string; similarityScore: number; provenanceLabel?: string | null };
+type ExternalCitation = { title: string; url: string };
 
 function hasAnswer(question: AdminQuestion) {
   return Boolean(question.answer_markdown?.trim()) || question.status === "Answered";
@@ -38,6 +42,11 @@ export function AdminAnswerWorkspace({
   const [queueView, setQueueView] = useState<QueueView>("needs_answer");
   const [search, setSearch] = useState("");
   const [fullEditorQuestion, setFullEditorQuestion] = useState<AdminQuestion | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setQuestions(initialQuestions), 0);
+    return () => window.clearTimeout(timeout);
+  }, [initialQuestions]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("en-US");
@@ -123,12 +132,17 @@ function AnswerComposer({
   onFullReview: () => void;
 }) {
   const router = useRouter();
+  const { withWarning, warningDialog } = useLlmCallWarning();
   const [answer, setAnswer] = useState(question.answer_markdown ?? "");
   const [references, setReferences] = useState(question.reference_links ?? "");
   const [status, setStatus] = useState(question.status);
   const [isPublic, setIsPublic] = useState(question.is_public);
   const [isAnswerPublic, setIsAnswerPublic] = useState(question.is_answer_public);
   const [aiDraft, setAiDraft] = useState(question.ai_draft_answer ?? "");
+  const [groundingMode, setGroundingMode] = useState<GroundingMode>("course_only");
+  const [draftSources, setDraftSources] = useState<DraftSource[]>([]);
+  const [externalCitations, setExternalCitations] = useState<ExternalCitation[]>([]);
+  const [draftConfidence, setDraftConfidence] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<SimilarQuestion[]>([]);
   const [findingDuplicates, setFindingDuplicates] = useState(false);
   const [state, setState] = useState<{ saving: boolean; generating: boolean; message?: string; error?: string }>({ saving: false, generating: false });
@@ -169,14 +183,24 @@ function AnswerComposer({
   async function generateDraft() {
     setState({ saving: false, generating: true });
     try {
-      const response = await fetch(`/api/admin/questions/${question.id}/generate-draft`, { method: "POST" });
-      const result = (await response.json()) as { draft?: string; message?: string };
+      const response = await fetch(`/api/admin/questions/${question.id}/generate-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grounding_mode: groundingMode }),
+      });
+      const result = (await response.json()) as {
+        draft?: string; message?: string; warning?: string | null; confidence?: string;
+        course_sources?: DraftSource[]; external_citations?: ExternalCitation[];
+      };
       if (!response.ok || !result.draft) {
         setState({ saving: false, generating: false, error: result.message ?? "Unable to generate a draft." });
         return;
       }
       setAiDraft(result.draft);
-      setState({ saving: false, generating: false, message: "AI draft generated. Review it before publishing." });
+      setDraftSources(result.course_sources ?? []);
+      setExternalCitations(result.external_citations ?? []);
+      setDraftConfidence(result.confidence ?? null);
+      setState({ saving: false, generating: false, message: result.warning ?? result.message ?? "Grounded AI draft generated. Review it before publishing." });
     } catch {
       setState({ saving: false, generating: false, error: "AI draft generation could not be reached." });
     }
@@ -192,16 +216,28 @@ function AnswerComposer({
     } catch { setFindingDuplicates(false); setState({ saving: false, generating: false, error: "Duplicate search could not be reached." }); }
   }
 
-  async function markDuplicate(candidate: SimilarQuestion) {
-    const response = await fetch(`/api/admin/questions/${question.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "Duplicate", duplicate_of_question_id: candidate.id }) });
-    const result = await response.json() as { question?: { updated_at: string }; message?: string };
-    if (!response.ok) { setState({ saving: false, generating: false, error: result.message ?? "Question could not be marked duplicate." }); return; }
-    setStatus("Duplicate"); onUpdated({ ...question, status: "Duplicate", duplicate_of_question_id: candidate.id, updated_at: result.question?.updated_at ?? question.updated_at });
-    setState({ saving: false, generating: false, message: "Question marked as a duplicate." });
+  async function mergeDuplicate(candidate: SimilarQuestion) {
+    const affected = candidate.participant_count ?? 0;
+    if (!window.confirm(`Consolidate this question into “${candidate.question_text.slice(0, 100)}”? ${affected} existing canonical voter${affected === 1 ? "" : "s"} will be included without double-counting.`)) return;
+    const response = await fetch(`/api/admin/questions/${question.id}/merge`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canonical_question_id: candidate.id }) });
+    const result = await response.json() as { message?: string };
+    if (!response.ok) { setState({ saving: false, generating: false, error: result.message ?? "Questions could not be consolidated." }); return; }
+    setStatus("Duplicate"); onUpdated({ ...question, status: "Duplicate", duplicate_of_question_id: candidate.id });
+    setState({ saving: false, generating: false, message: result.message ?? "Questions consolidated." });
+  }
+
+  async function undoMerge() {
+    const response = await fetch(`/api/admin/questions/${question.id}/merge`, { method: "DELETE" });
+    const result = await response.json() as { message?: string; question?: { status: string; duplicate_of_question_id: string | null; updated_at: string } };
+    if (!response.ok) { setState({ saving: false, generating: false, error: result.message ?? "Merge could not be undone." }); return; }
+    const restoredStatus = result.question?.status ?? "New";
+    setStatus(restoredStatus); onUpdated({ ...question, status: restoredStatus, duplicate_of_question_id: result.question?.duplicate_of_question_id ?? null, updated_at: result.question?.updated_at ?? question.updated_at });
+    setState({ saving: false, generating: false, message: result.message ?? "Merge undone." });
   }
 
   return (
     <div className="answer-composer">
+      {warningDialog}
       <header className="answer-composer__header">
         <div><div><StatusBadge status={status} /><PriorityBadge priority={question.priority} /></div><h2>{question.question_text}</h2><p>{question.module_topic ?? "No module"} · {question.student_name} · {question.upvote_count} upvotes</p></div>
         <button type="button" onClick={onFullReview}><Edit3 size={15} /> Full review</button>
@@ -209,13 +245,24 @@ function AnswerComposer({
 
       {question.feedback?.satisfaction_status === "not_satisfied" && <div className="answer-composer__feedback"><strong>Participant needs clarification</strong><p>{question.feedback.reason ?? "No reason provided."}</p></div>}
 
+      <section className="grounding-control" aria-label="AI grounding mode">
+        <div><strong>AI source policy</strong><span>Choose what the copilot may use for this draft.</span></div>
+        <div className="grounding-control__options">
+          <button type="button" className={groundingMode === "course_only" ? "is-active" : ""} onClick={() => setGroundingMode("course_only")}><BookOpen size={15} /><span><strong>Course only</strong><small>Strictly approved library content</small></span></button>
+          <button type="button" className={groundingMode === "course_and_web" ? "is-active" : ""} onClick={() => setGroundingMode("course_and_web")}><Globe2 size={15} /><span><strong>Course + web</strong><small>External search; additional API cost</small></span></button>
+        </div>
+      </section>
+
       <div className="answer-composer__toolbar">
-        <Button type="button" variant="secondary" onClick={generateDraft} disabled={state.generating}><Sparkles size={15} /> {state.generating ? "Generating…" : "Generate AI draft"}</Button>
-        <Button type="button" variant="secondary" onClick={findDuplicates} disabled={findingDuplicates}><GitCompareArrows size={15} /> {findingDuplicates ? "Comparing…" : "Find duplicates"}</Button>
+        <Button type="button" variant="secondary" onClick={() => withWarning("generate-draft", generateDraft)} disabled={state.generating}><Sparkles size={15} /> {state.generating ? "Generating…" : "Generate AI draft"}</Button>
+        <Button type="button" variant="secondary" onClick={() => withWarning("find-duplicates", findDuplicates)} disabled={findingDuplicates}><GitCompareArrows size={15} /> {findingDuplicates ? "Comparing…" : "Find duplicates"}</Button>
+        {question.duplicate_of_question_id && <Button type="button" variant="secondary" onClick={() => void undoMerge()}>Undo merge</Button>}
         {aiDraft && <button type="button" onClick={() => { setAnswer(aiDraft); setState({ saving: false, generating: false, message: "AI draft copied. Review and publish when ready." }); }}><ClipboardCopy size={14} /> Copy draft into answer</button>}
       </div>
-      {aiDraft && <details className="answer-composer__ai"><summary><Bot size={14} /> Review AI draft</summary><div>{aiDraft}</div></details>}
-      {duplicates.length > 0 && <section className="duplicate-results"><header><GitCompareArrows size={16} /><strong>Possible duplicates</strong></header>{duplicates.map((candidate) => <article key={candidate.id}><div><strong>{Math.round(candidate.similarity_score * 100)}% match</strong><p>{candidate.question_text}</p>{candidate.similarity_reason && <small>{candidate.similarity_reason}</small>}</div><Button variant="secondary" onClick={() => void markDuplicate(candidate)}>Mark duplicate</Button></article>)}</section>}
+      {aiDraft && <details className="answer-composer__ai" open={draftSources.length > 0}><summary><Bot size={14} /> Review AI draft {draftConfidence && <span className={`draft-confidence draft-confidence--${draftConfidence}`}>{draftConfidence} confidence</span>}</summary><div>{aiDraft}</div>
+        {(draftSources.length > 0 || externalCitations.length > 0) && <section className="draft-evidence"><strong>Evidence used</strong><div>{draftSources.map((source) => <a key={source.entryId} href={`/questions?section=knowledge&kind=${source.kind}#knowledge-entry-${source.entryId}`} target="_blank" rel="noreferrer"><BookOpen size={13} /><span><b>[{source.citationId}] {source.sectionTitle}</b><small>{source.documentTitle}{source.provenanceLabel ? ` · ${source.provenanceLabel}` : ""} · {Math.round(source.similarityScore * 100)}% retrieval match</small></span></a>)}{externalCitations.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer"><Globe2 size={13} /><span><b>{source.title}</b><small>{source.url}</small></span></a>)}</div></section>}
+      </details>}
+      {duplicates.length > 0 && <section className="duplicate-results"><header><GitCompareArrows size={16} /><strong>Possible duplicates</strong></header>{duplicates.map((candidate) => <article key={candidate.id}><div><strong>{Math.round(candidate.similarity_score * 100)}% match · {candidate.participant_count ?? 0} existing voters</strong><p>{candidate.question_text}</p>{candidate.similarity_reason && <small>{candidate.similarity_reason}</small>}</div><Button variant="secondary" onClick={() => void mergeDuplicate(candidate)}>Consolidate</Button></article>)}</section>}
 
       <label className="answer-composer__field">Instructor answer <span>Markdown supported</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} rows={12} placeholder="Write a clear, concise answer for the student…" /></label>
       <label className="answer-composer__field">Reference links <span>Optional</span><textarea value={references} onChange={(event) => setReferences(event.target.value)} rows={3} placeholder="Add useful references or documentation links…" /></label>

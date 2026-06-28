@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AdminAnswerWorkspace } from "@/components/admin-answer-workspace";
+import { AdminAutoRefresh } from "@/components/admin-auto-refresh";
 import {
   getAdminQuestions,
   getDuplicateQuestionOptions,
@@ -18,6 +19,7 @@ export default async function AdminQuestionsPage() {
 
   return (
     <section className="admin-page admin-answer-page">
+      <AdminAutoRefresh intervalMs={30_000} />
       <AdminAnswerWorkspace
         initialQuestions={questions}
         duplicateOptions={duplicateOptions}

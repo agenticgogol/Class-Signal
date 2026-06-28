@@ -1,4 +1,5 @@
 create extension if not exists pgcrypto;
+create extension if not exists vector with schema extensions;
 
 create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
@@ -13,6 +14,7 @@ create table if not exists public.questions (
   status text not null default 'New',
   priority text not null default 'Medium',
   answer_markdown text,
+  answer_html text,
   reference_links text,
   admin_notes text,
   ai_draft_answer text,
@@ -83,7 +85,7 @@ create table if not exists public.question_feedback (
 create table if not exists public.knowledge_documents (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  kind text not null check (kind in ('faq', 'theory')),
+  kind text not null check (kind in ('faq', 'theory', 'code')),
   source_filename text,
   module_topic text,
   is_visible boolean not null default false,
@@ -110,6 +112,40 @@ create table if not exists public.knowledge_entries (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.knowledge_sources (
+  id uuid primary key default gen_random_uuid(), title text not null,
+  kind text not null check (kind in ('faq','theory','code')), document_key text not null unique,
+  module_topic text, created_by uuid, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table if not exists public.knowledge_source_versions (
+  id uuid primary key default gen_random_uuid(), source_id uuid not null references public.knowledge_sources(id) on delete cascade,
+  version_number integer not null, original_filename text not null, mime_type text, byte_size bigint not null,
+  checksum_sha256 text not null, storage_path text not null,
+  processing_status text not null default 'queued', scan_status text not null default 'pending',
+  warnings jsonb not null default '[]', error_message text, created_by uuid,
+  created_at timestamptz not null default now(), completed_at timestamptz,
+  unique(source_id, version_number), unique(source_id, checksum_sha256)
+);
+create table if not exists public.ingestion_jobs (
+  id uuid primary key default gen_random_uuid(), source_version_id uuid not null references public.knowledge_source_versions(id) on delete cascade,
+  status text not null default 'queued', progress integer not null default 0, stage_message text,
+  warnings jsonb not null default '[]', error_message text, started_at timestamptz, completed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create table if not exists public.knowledge_assets (
+  id uuid primary key default gen_random_uuid(), source_version_id uuid not null references public.knowledge_source_versions(id) on delete cascade,
+  original_path text not null, storage_path text not null, mime_type text not null, byte_size bigint not null,
+  checksum_sha256 text not null, created_at timestamptz not null default now(), unique(source_version_id, original_path)
+);
+alter table public.knowledge_documents add column if not exists source_version_id uuid references public.knowledge_source_versions(id) on delete set null;
+alter table public.knowledge_entries add column if not exists source_version_id uuid references public.knowledge_source_versions(id) on delete set null;
+alter table public.knowledge_entries add column if not exists provenance_type text;
+alter table public.knowledge_entries add column if not exists provenance_label text;
+alter table public.knowledge_entries add column if not exists provenance_start integer;
+alter table public.knowledge_entries add column if not exists provenance_end integer;
+alter table public.knowledge_entries add column if not exists checksum_sha256 text;
+alter table public.knowledge_entries add column if not exists embedding extensions.vector(1536);
+
 create table if not exists public.question_knowledge_suggestions (
   id uuid primary key default gen_random_uuid(),
   question_id uuid not null references public.questions(id) on delete cascade,
@@ -121,8 +157,49 @@ create table if not exists public.question_knowledge_suggestions (
   unique(question_id, entry_id)
 );
 
+create table if not exists public.knowledge_gaps (
+  id uuid primary key default gen_random_uuid(), concept_key text not null unique,
+  concept_label text not null, module_topic text,
+  suggested_kind text not null default 'faq' check (suggested_kind in ('faq', 'theory', 'code')),
+  status text not null default 'open' check (status in ('open', 'drafting', 'resolved', 'dismissed')),
+  signal_summary jsonb not null default '{}'::jsonb,
+  resolved_by_entry_id uuid references public.knowledge_entries(id) on delete set null,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table if not exists public.knowledge_gap_questions (
+  gap_id uuid not null references public.knowledge_gaps(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  created_at timestamptz not null default now(), primary key (gap_id, question_id)
+);
+
+create table if not exists public.question_duplicate_merges (
+  id uuid primary key default gen_random_uuid(),
+  duplicate_question_id uuid not null references public.questions(id) on delete cascade,
+  canonical_question_id uuid not null references public.questions(id) on delete cascade,
+  previous_status text not null, previous_duplicate_of_question_id uuid references public.questions(id),
+  merged_by uuid, merged_at timestamptz not null default now(), undone_by uuid, undone_at timestamptz,
+  check (duplicate_question_id <> canonical_question_id)
+);
+
+create table if not exists public.class_join_sessions (
+  id uuid primary key default gen_random_uuid(), public_id uuid not null default gen_random_uuid() unique,
+  session_key text not null unique, course_name text not null, class_date date not null, class_number text,
+  is_active boolean not null default true, created_by uuid, created_at timestamptz not null default now(), closed_at timestamptz
+);
+
+create table if not exists public.teaching_briefs (
+  id uuid primary key default gen_random_uuid(), session_key text not null, course_name text not null,
+  class_date date not null, class_number text, version_number integer not null default 1,
+  input_metrics jsonb not null, content_markdown text not null, created_by uuid,
+  created_at timestamptz not null default now(), unique(session_key, version_number)
+);
+
 create unique index if not exists one_current_knowledge_document on public.knowledge_documents(document_key) where is_current = true;
 create index if not exists knowledge_entries_sequence_idx on public.knowledge_entries(document_id, sequence_number);
+create unique index if not exists one_active_merge_per_question on public.question_duplicate_merges(duplicate_question_id) where undone_at is null;
+create index if not exists duplicate_merges_canonical_idx on public.question_duplicate_merges(canonical_question_id) where undone_at is null;
+create index if not exists knowledge_gap_status_idx on public.knowledge_gaps(status, updated_at desc);
 
 create unique index if not exists one_active_public_settings
 on public.public_settings (is_active)
@@ -137,6 +214,15 @@ alter table public.question_feedback enable row level security;
 alter table public.knowledge_documents enable row level security;
 alter table public.knowledge_entries enable row level security;
 alter table public.question_knowledge_suggestions enable row level security;
+alter table public.knowledge_gaps enable row level security;
+alter table public.knowledge_gap_questions enable row level security;
+alter table public.question_duplicate_merges enable row level security;
+alter table public.class_join_sessions enable row level security;
+alter table public.teaching_briefs enable row level security;
+alter table public.knowledge_sources enable row level security;
+alter table public.knowledge_source_versions enable row level security;
+alter table public.ingestion_jobs enable row level security;
+alter table public.knowledge_assets enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger as $$
@@ -247,3 +333,17 @@ on public.knowledge_entries for all to authenticated using (true) with check (tr
 drop policy if exists "Authenticated admin can manage knowledge suggestions" on public.question_knowledge_suggestions;
 create policy "Authenticated admin can manage knowledge suggestions"
 on public.question_knowledge_suggestions for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage knowledge gaps"
+on public.knowledge_gaps for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage gap questions"
+on public.knowledge_gap_questions for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage duplicate merges"
+on public.question_duplicate_merges for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage class join sessions"
+on public.class_join_sessions for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage teaching briefs"
+on public.teaching_briefs for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage knowledge sources" on public.knowledge_sources for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage knowledge source versions" on public.knowledge_source_versions for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage ingestion jobs" on public.ingestion_jobs for all to authenticated using (true) with check (true);
+create policy "Authenticated admins manage knowledge assets" on public.knowledge_assets for all to authenticated using (true) with check (true);

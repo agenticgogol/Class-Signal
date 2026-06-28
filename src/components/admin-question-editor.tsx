@@ -5,6 +5,7 @@ import { Check, Copy, Eye, EyeOff, Search, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { useLlmCallWarning } from "@/components/llm-call-warning";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ export function AdminQuestionEditor({
   onClose,
 }: EditorProps) {
   const router = useRouter();
+  const { withWarning, warningDialog } = useLlmCallWarning();
   const closeTimeoutRef = useRef<number | null>(null);
   const [answer, setAnswer] = useState(question.answer_markdown ?? "");
   const [draft, setDraft] = useState(question.ai_draft_answer ?? "");
@@ -121,19 +123,19 @@ export function AdminQuestionEditor({
   async function markAsDuplicate(match: SimilarQuestion) {
     setDuplicateState({ loading: false, markingId: match.id });
     try {
-      const response = await fetch(`/api/admin/questions/${question.id}`, {
-        method: "PATCH",
+      const response = await fetch(`/api/admin/questions/${question.id}/merge`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ duplicate_of_question_id: match.id, status: "Duplicate" }),
+        body: JSON.stringify({ canonical_question_id: match.id }),
       });
       const result = (await response.json()) as { message?: string };
       if (!response.ok) {
-        setDuplicateState({ loading: false, error: result.message ?? "Unable to mark this duplicate." });
+        setDuplicateState({ loading: false, error: result.message ?? "Unable to consolidate these questions." });
         return;
       }
       setDuplicateId(match.id);
       setStatus("Duplicate");
-      setDuplicateState({ loading: false, message: "Question marked as a duplicate." });
+      setDuplicateState({ loading: false, message: result.message ?? "Questions consolidated." });
       router.refresh();
     } catch {
       setDuplicateState({ loading: false, error: "Check your connection and try again." });
@@ -152,7 +154,6 @@ export function AdminQuestionEditor({
       admin_notes: form.get("admin_notes"),
       is_public: form.get("is_public") === "on",
       is_answer_public: form.get("is_answer_public") === "on",
-      duplicate_of_question_id: form.get("duplicate_of_question_id") || null,
     };
 
     try {
@@ -175,6 +176,8 @@ export function AdminQuestionEditor({
   }
 
   return (
+    <>
+    {warningDialog}
     <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="question-editor-title">
       <button className="admin-modal__backdrop" type="button" onClick={onClose} aria-label="Close editor" />
       <div className="admin-editor">
@@ -212,11 +215,11 @@ export function AdminQuestionEditor({
             </div>
             <label className="admin-check"><input name="is_public" type="checkbox" defaultChecked={question.is_public} /> {question.is_public ? <Eye size={16} /> : <EyeOff size={16} />} Publicly visible</label>
             <label className="admin-check"><input name="is_answer_public" type="checkbox" defaultChecked={question.is_answer_public} /> Publish answer to participant</label>
-            <label>Duplicate of<select name="duplicate_of_question_id" value={duplicateId} onChange={(event) => setDuplicateId(event.target.value)}><option value="">Not a duplicate</option>{duplicateOptions.filter((option) => option.id !== question.id).map((option) => <option key={option.id} value={option.id}>{option.course_name} — {option.question_text.slice(0, 80)}</option>)}</select></label>
+            {duplicateId && <div className="admin-feedback-reason"><strong>Canonical question</strong><p>{duplicateOptions.find((option) => option.id === duplicateId)?.question_text ?? duplicateId}</p><span>Use the merge controls below to change consolidation.</span></div>}
             <section className="duplicate-panel">
               <div className="duplicate-panel__header">
                 <div><span>Similarity check</span><h3>Potential duplicates</h3></div>
-                <Button type="button" variant="secondary" onClick={findDuplicates} disabled={duplicateState.loading || Boolean(duplicateState.markingId)}>
+                <Button type="button" variant="secondary" onClick={() => withWarning("find-duplicates", findDuplicates)} disabled={duplicateState.loading || Boolean(duplicateState.markingId)}>
                   <Search size={15} /> {duplicateState.loading ? "Searching…" : "Find duplicates"}
                 </Button>
               </div>
@@ -226,7 +229,7 @@ export function AdminQuestionEditor({
                     <li key={match.id}>
                       <div>
                         <strong>{match.question_text}</strong>
-                        <span>{match.course_name} · {Math.round(match.similarity_score * 100)}% similar · {match.method === "anthropic_ai" ? "Anthropic" : match.method === "local_similarity" ? "Local" : "AI"}</span>
+                        <span>{match.course_name} · {Math.round(match.similarity_score * 100)}% similar · {match.participant_count ?? 0} voters · {match.method === "anthropic_ai" ? "Anthropic" : match.method === "local_similarity" ? "Local" : "AI"}</span>
                         {match.similarity_reason && <p>{match.similarity_reason}</p>}
                       </div>
                       <button
@@ -234,7 +237,7 @@ export function AdminQuestionEditor({
                         onClick={() => markAsDuplicate(match)}
                         disabled={Boolean(duplicateState.markingId)}
                       >
-                        <Check size={14} /> {duplicateState.markingId === match.id ? "Marking…" : "Mark duplicate"}
+                        <Check size={14} /> {duplicateState.markingId === match.id ? "Merging…" : "Consolidate"}
                       </button>
                     </li>
                   ))}
@@ -248,7 +251,7 @@ export function AdminQuestionEditor({
             <section className="ai-draft-panel">
               <div className="ai-draft-panel__header">
                 <div><span>AI assistant</span><h3>Draft answer</h3></div>
-                <Button type="button" variant="secondary" onClick={generateDraft} disabled={draftState.loading}>
+                <Button type="button" variant="secondary" onClick={() => withWarning("generate-draft", generateDraft)} disabled={draftState.loading}>
                   <Sparkles size={15} /> {draftState.loading ? "Generating…" : "Generate draft answer"}
                 </Button>
               </div>
@@ -287,5 +290,6 @@ export function AdminQuestionEditor({
         </div>
       </div>
     </div>
+    </>
   );
 }

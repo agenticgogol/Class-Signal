@@ -1,4 +1,4 @@
-export type KnowledgeKind = "faq" | "theory";
+export type KnowledgeKind = "faq" | "theory" | "code";
 
 export type KnowledgeEntrySummary = {
   id: string;
@@ -7,6 +7,8 @@ export type KnowledgeEntrySummary = {
   is_visible: boolean;
   created_at: string;
   sequence_number: number;
+  provenance_label: string | null;
+  content_html?: string;
 };
 
 export type KnowledgeDocument = {
@@ -29,8 +31,9 @@ export type PublicKnowledgeEntry = {
   id: string;
   title: string;
   module_topic: string | null;
-  content_html: string;
+  content_html?: string;
   sequence_number: number;
+  provenance_label: string | null;
 };
 
 export type PublicKnowledgeDocument = {
@@ -47,4 +50,9 @@ export type KnowledgeSuggestion = {
   title: string;
   content_html: string;
   similarity_score: number;
+  confidence_band: "high" | "medium" | "low";
+  entry_id: string;
+  document_title: string;
+  module_topic: string | null;
+  provenance_label: string | null;
 };

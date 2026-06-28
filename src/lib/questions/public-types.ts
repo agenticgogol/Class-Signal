@@ -14,10 +14,13 @@ export type PublicQuestion = {
   module_topic: string | null;
   status: string;
   answer_markdown: string | null;
+  answer_html: string | null;
   answer_source: "instructor" | "knowledge";
   reference_links: string | null;
   created_at: string;
   upvote_count: number;
+  canonical_question_id: string | null;
+  canonical_question_text: string | null;
 };
 
 export type PublicQuestionsResponse = {

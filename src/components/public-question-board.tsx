@@ -1,7 +1,8 @@
 import { format, parseISO } from "date-fns";
-import { CalendarDays, CheckCircle2, ChevronDown, Clock3, Layers3 } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronDown, Clock3, Layers3, Link2 } from "lucide-react";
 
 import { MarkdownPreview } from "@/components/markdown-preview";
+import { KnowledgeHtml } from "@/components/knowledge-html";
 import { StatusBadge } from "@/components/status-badge";
 import { UpvoteButton } from "@/components/upvote-button";
 import type { PublicQuestion } from "@/lib/questions/public-types";
@@ -28,7 +29,7 @@ export function PublicQuestionBoard({
   return (
     <div className="question-list">
       {questions.map((question, index) => (
-        <article className="public-question" key={question.id}>
+        <article className="public-question" key={question.id} id={`question-${question.id}`}>
           <div className="public-question__rank" aria-label={`Rank ${index + 1}`}>
             {String(index + 1).padStart(2, "0")}
           </div>
@@ -39,6 +40,7 @@ export function PublicQuestionBoard({
               <span className="course-label">{question.course_name}</span>
             </div>
             <h2>{question.question_text}</h2>
+            {question.canonical_question_id && <a className="canonical-question-link" href={`#question-${question.canonical_question_id}`}><Link2 size={14} /><span><strong>Tracked with an existing question</strong>{question.canonical_question_text && <small>{question.canonical_question_text}</small>}</span></a>}
             <div className="question-meta">
               {question.class_date && (
                 <span>
@@ -53,13 +55,13 @@ export function PublicQuestionBoard({
             </div>
             <div className="public-question__vote">
               {votingEnabled
-                ? <UpvoteButton questionId={question.id} initialCount={question.upvote_count} accessCode={accessCode} />
+                ? <UpvoteButton questionId={question.canonical_question_id ?? question.id} initialCount={question.upvote_count} accessCode={accessCode} />
                 : <span className="voting-disabled">Voting is disabled</span>}
             </div>
-            {question.answer_markdown ? (
+            {question.answer_markdown || question.answer_html ? (
               <details className="public-answer">
                 <summary><span><CheckCircle2 size={15} /> {question.answer_source === "knowledge" ? "Pulled from course FAQ / Theory" : "Instructor answer"}</span><span>View answer <ChevronDown size={15} /></span></summary>
-                <div className="public-answer__content"><MarkdownPreview>{question.answer_markdown}</MarkdownPreview>
+                <div className="public-answer__content">{question.answer_html ? <KnowledgeHtml html={question.answer_html} /> : <MarkdownPreview>{question.answer_markdown ?? ""}</MarkdownPreview>}
                   {question.reference_links && <div className="public-answer__references"><strong>References</strong><MarkdownPreview>{question.reference_links}</MarkdownPreview></div>}
                 </div>
               </details>

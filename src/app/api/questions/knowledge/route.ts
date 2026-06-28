@@ -25,21 +25,21 @@ export async function GET(request: Request) {
     if (ids.length === 0) return Response.json({ documents: [] });
     const { data: entries, error: entryError } = await supabase
       .from("knowledge_entries")
-      .select("id, document_id, title, module_topic, content_html, sequence_number")
+      .select("id, document_id, title, module_topic, sequence_number, provenance_label")
       .in("document_id", ids)
       .eq("is_visible", true)
       .order("sequence_number", { ascending: true });
     if (entryError?.code === "42703") {
-      const legacyEntries = await supabase.from("knowledge_entries").select("id, document_id, title, module_topic, content_html").in("document_id", ids).eq("is_visible", true).order("created_at", { ascending: true });
+      const legacyEntries = await supabase.from("knowledge_entries").select("id, document_id, title, module_topic").in("document_id", ids).eq("is_visible", true).order("created_at", { ascending: true });
       if (legacyEntries.error) throw legacyEntries.error;
-      return Response.json({ documents: (documents ?? []).map((document) => ({ ...document, knowledge_entries: (legacyEntries.data ?? []).filter((entry) => entry.document_id === document.id).map((entry, sequence_number) => ({ id: entry.id, title: entry.title, module_topic: entry.module_topic, content_html: entry.content_html, sequence_number })) })) }, { headers: { "Cache-Control": "private, no-store" } });
+      return Response.json({ documents: (documents ?? []).map((document) => ({ ...document, knowledge_entries: (legacyEntries.data ?? []).filter((entry) => entry.document_id === document.id).map((entry, sequence_number) => ({ id: entry.id, title: entry.title, module_topic: entry.module_topic, sequence_number, provenance_label: null })) })) }, { headers: { "Cache-Control": "private, no-store" } });
     }
     if (entryError) throw entryError;
 
     return Response.json({
       documents: (documents ?? []).map((document) => ({
         ...document,
-        knowledge_entries: (entries ?? []).filter((entry) => entry.document_id === document.id).sort((left, right) => left.sequence_number - right.sequence_number).map((entry) => ({ id: entry.id, title: entry.title, module_topic: entry.module_topic, content_html: entry.content_html, sequence_number: entry.sequence_number })),
+        knowledge_entries: (entries ?? []).filter((entry) => entry.document_id === document.id).sort((left, right) => left.sequence_number - right.sequence_number).map((entry) => ({ id: entry.id, title: entry.title, module_topic: entry.module_topic, sequence_number: entry.sequence_number, provenance_label: entry.provenance_label })),
       })),
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

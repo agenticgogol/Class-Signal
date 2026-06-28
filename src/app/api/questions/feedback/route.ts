@@ -33,12 +33,17 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const { data: question, error: questionError } = await supabase
       .from("questions")
-      .select("id, answer_markdown, is_answer_public")
+      .select("id, answer_markdown, answer_html, is_answer_public, duplicate_of_question_id")
       .eq("id", questionId)
       .eq("student_email", email)
       .maybeSingle();
     if (questionError) throw questionError;
-    if (!question?.answer_markdown || !question.is_answer_public) {
+    let hasPublicAnswer = Boolean(question && (question.answer_markdown || question.answer_html) && question.is_answer_public);
+    if (question?.duplicate_of_question_id) {
+      const { data: canonical } = await supabase.from("questions").select("answer_markdown, answer_html, is_answer_public").eq("id", question.duplicate_of_question_id).maybeSingle();
+      hasPublicAnswer = Boolean(canonical && (canonical.answer_markdown || canonical.answer_html) && canonical.is_answer_public);
+    }
+    if (!question || !hasPublicAnswer) {
       return Response.json({ message: "Feedback is available only for your published answered questions." }, { status: 403 });
     }
     const { data: feedback, error } = await supabase.from("question_feedback").upsert(
@@ -51,6 +56,19 @@ export async function POST(request: Request) {
       { onConflict: "question_id,participant_email" },
     ).select("satisfaction_status, reason, created_at, updated_at").single();
     if (error) throw error;
+    const { data: gapLinks } = await supabase.from("knowledge_gap_questions").select("gap_id").eq("question_id", questionId);
+    for (const link of gapLinks ?? []) {
+      if (satisfactionStatus === "not_satisfied") {
+        await supabase.from("knowledge_gaps").update({ status: "open", updated_at: new Date().toISOString() }).eq("id", link.gap_id).neq("status", "dismissed");
+        continue;
+      }
+      const { data: members } = await supabase.from("knowledge_gap_questions").select("questions(answer_markdown, answer_html, status, question_feedback(satisfaction_status))").eq("gap_id", link.gap_id);
+      const resolved = (members ?? []).every((member) => {
+        const related = member.questions as unknown as { answer_markdown: string | null; answer_html: string | null; status: string; question_feedback: Array<{ satisfaction_status: string }> | null } | null;
+        return Boolean(related && (related.answer_markdown || related.answer_html || related.status === "Answered") && !related.question_feedback?.some((item) => item.satisfaction_status === "not_satisfied"));
+      });
+      if (resolved) await supabase.from("knowledge_gaps").update({ status: "resolved", updated_at: new Date().toISOString() }).eq("id", link.gap_id).neq("status", "dismissed");
+    }
     return Response.json({ feedback, message: "Feedback saved." });
   } catch (error) {
     if (error instanceof Error && error.name === "StudentAccessError") return studentAccessErrorResponse(error);

@@ -9,7 +9,7 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 
 type AdminQuestionRow = Omit<AdminQuestion, "upvote_count" | "feedback"> & {
-  question_votes: Array<{ count: number }> | null;
+  question_votes: Array<{ voter_email: string }> | null;
   question_feedback: AdminQuestion["feedback"][] | null;
 };
 
@@ -18,7 +18,7 @@ const adminQuestionSelect = `
   module_topic, question_text, normalized_question_text, status, priority,
   answer_markdown, reference_links, admin_notes, ai_draft_answer, is_answer_public, is_public,
   duplicate_of_question_id, created_at, updated_at, answered_at,
-  question_votes(count),
+  question_votes(voter_email),
   question_feedback(satisfaction_status, reason, participant_email, created_at, updated_at)
 `;
 
@@ -52,7 +52,14 @@ export async function getAdminQuestions(filters: AdminQuestionFilters): Promise<
     throw new Error("Unable to load admin questions.");
   }
 
-  let questions = (data as AdminQuestionRow[]).map((row) => ({
+  const rows = data as AdminQuestionRow[];
+  const membersByCanonical = new Map<string, AdminQuestionRow[]>();
+  for (const row of rows) {
+    const canonicalId = row.duplicate_of_question_id ?? row.id;
+    membersByCanonical.set(canonicalId, [...(membersByCanonical.get(canonicalId) ?? []), row]);
+  }
+  const consolidatedVotes = (row: AdminQuestionRow) => new Set((membersByCanonical.get(row.duplicate_of_question_id ?? row.id) ?? [row]).flatMap((member) => (member.question_votes ?? []).map((vote) => vote.voter_email.toLocaleLowerCase("en-US")))).size;
+  let questions = rows.map((row) => ({
     id: row.id,
     student_name: row.student_name,
     student_email: row.student_email,
@@ -75,7 +82,7 @@ export async function getAdminQuestions(filters: AdminQuestionFilters): Promise<
     created_at: row.created_at,
     updated_at: row.updated_at,
     answered_at: row.answered_at,
-    upvote_count: row.question_votes?.[0]?.count ?? 0,
+    upvote_count: consolidatedVotes(row),
     feedback: row.question_feedback?.[0] ?? null,
   }));
 

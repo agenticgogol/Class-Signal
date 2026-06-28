@@ -39,13 +39,21 @@ export async function POST(request: Request) {
     const part = (type: Intl.DateTimeFormatPartTypes) => dateParts.find((value) => value.type === type)?.value;
     const classDate = `${part("year")}-${part("month")}-${part("day")}`;
     const supabase = createAdminClient();
+    const publicSessionId = typeof body === "object" && body !== null && !Array.isArray(body) && typeof (body as Record<string, unknown>).public_session_id === "string"
+      ? String((body as Record<string, unknown>).public_session_id) : null;
+    let session: { course_name: string; class_date: string; class_number: string | null } | null = null;
+    if (publicSessionId) {
+      const { data: activeSession } = await supabase.from("class_join_sessions").select("course_name, class_date, class_number").eq("public_id", publicSessionId).eq("is_active", true).maybeSingle();
+      if (!activeSession) return Response.json({ message: "This class join link is no longer active." }, { status: 409 });
+      session = activeSession;
+    }
     const { data, error } = await supabase
       .from("questions")
       .insert({
         ...question,
-        course_name: settings.default_course_name,
-        class_date: classDate,
-        class_number: null,
+        course_name: session?.course_name ?? settings.default_course_name,
+        class_date: session?.class_date ?? classDate,
+        class_number: session?.class_number ?? null,
         student_email: question.student_email.toLocaleLowerCase("en-US"),
         normalized_question_text: normalizeQuestionText(question.question_text),
       })
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
     if (match) {
       const { data: suggestion, error: suggestionError } = await supabase.from("question_knowledge_suggestions").insert({
         question_id: data.id,
-        entry_id: match.entryId,
+        entry_id: match.entry_id,
         similarity_score: match.similarity_score,
       }).select("id").single();
       if (!suggestionError && suggestion) savedSuggestion = { ...match, id: suggestion.id };

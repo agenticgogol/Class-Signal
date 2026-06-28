@@ -6,6 +6,30 @@ export type AiRuntimeSettings = {
   apiKey: string;
 };
 
+export type GroundingMode = "course_only" | "course_and_web";
+
+export type GroundingSource = {
+  citationId: string;
+  entryId: string;
+  kind: "faq" | "theory" | "code";
+  documentTitle: string;
+  sectionTitle: string;
+  moduleTopic: string | null;
+  excerpt: string;
+  similarityScore: number;
+  lexicalScore: number;
+  semanticScore: number | null;
+  provenanceLabel: string | null;
+};
+
+export type ExternalCitation = { title: string; url: string };
+
+export type DraftAnswerResult = {
+  draft: string;
+  externalCitations: ExternalCitation[];
+  webSearchUsed: boolean;
+};
+
 export type DraftAnswerInput = {
   questionText: string;
   courseName: string;
@@ -13,6 +37,8 @@ export type DraftAnswerInput = {
   classNumber: string | null;
   moduleTopic: string | null;
   referenceLinks: string | null;
+  groundingMode: GroundingMode;
+  courseSources: GroundingSource[];
 };
 
 export type DuplicateCandidate = {
@@ -38,7 +64,7 @@ export class AiProviderError extends Error {
 }
 
 export type AiProvider = {
-  generateDraftAnswer(input: DraftAnswerInput, settings: AiRuntimeSettings): Promise<string>;
+  generateDraftAnswer(input: DraftAnswerInput, settings: AiRuntimeSettings): Promise<DraftAnswerResult>;
   rerankDuplicates?(
     questionText: string,
     candidates: DuplicateCandidate[],

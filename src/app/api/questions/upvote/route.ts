@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const { question_id, voter_email } = validation.data;
     const { data: question, error: questionError } = await supabase
       .from("questions")
-      .select("id")
+      .select("id, duplicate_of_question_id")
       .eq("id", question_id)
       .eq("is_public", true)
       .maybeSingle();
@@ -43,9 +43,19 @@ export async function POST(request: Request) {
       return Response.json({ message: "That public question was not found." }, { status: 404 });
     }
 
+    const canonicalQuestionId = question.duplicate_of_question_id ?? question.id;
+    const { data: groupRows, error: groupError } = await supabase
+      .from("questions")
+      .select("id")
+      .or(`id.eq.${canonicalQuestionId},duplicate_of_question_id.eq.${canonicalQuestionId}`);
+    if (groupError) return Response.json({ message: "We could not record this upvote." }, { status: 500 });
+    const normalizedEmail = voter_email.toLocaleLowerCase("en-US");
+    const { data: existingVote } = await supabase.from("question_votes").select("id").in("question_id", (groupRows ?? []).map((row) => row.id)).eq("voter_email", normalizedEmail).limit(1).maybeSingle();
+    if (existingVote) return Response.json({ message: "This email has already upvoted this consolidated question." }, { status: 409 });
+
     const { error } = await supabase.from("question_votes").insert({
-      question_id,
-      voter_email: voter_email.toLocaleLowerCase("en-US"),
+      question_id: canonicalQuestionId,
+      voter_email: normalizedEmail,
     });
 
     if (error?.code === "23505") {
@@ -59,7 +69,7 @@ export async function POST(request: Request) {
       return Response.json({ message: "We could not record this upvote." }, { status: 500 });
     }
 
-    return Response.json({ message: "Upvote recorded." }, { status: 201 });
+    return Response.json({ message: "Upvote recorded.", canonical_question_id: canonicalQuestionId }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.name === "StudentAccessError") {
       return studentAccessErrorResponse(error);

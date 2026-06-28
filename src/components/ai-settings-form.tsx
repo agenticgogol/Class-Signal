@@ -61,7 +61,7 @@ export function AiSettingsForm({ initialSettings }: { initialSettings: AiSetting
       <div className="ai-settings-section">
         <div className="ai-settings-section__title">
           <span><Bot size={18} /></span>
-          <div><h2>Provider configuration</h2><p>Choose the service and model used for future admin-triggered AI actions.</p></div>
+          <div><h2>Provider configuration</h2><p>Choose the service and model used for admin-triggered AI actions. Course + web drafting is available with OpenAI and Anthropic. Hybrid Course Library search is enabled separately with the server-only OPENAI_EMBEDDING_API_KEY environment variable, so student submissions never create hidden token cost unless you opt in.</p></div>
         </div>
         <div className="ai-settings-fields">
           <label>

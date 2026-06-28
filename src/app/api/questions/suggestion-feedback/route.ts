@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (!question || question.student_email.toLocaleLowerCase("en-US") !== email) return Response.json({ message: "That email does not match this question." }, { status: 403 });
     const { data: suggestion, error } = await supabase
       .from("question_knowledge_suggestions")
-      .select("id, question_id, knowledge_entries(content_text)")
+      .select("id, question_id, knowledge_entries(content_text, content_html)")
       .eq("id", suggestionId)
       .eq("question_id", questionId)
       .maybeSingle();
@@ -28,16 +28,26 @@ export async function POST(request: Request) {
 
     await supabase.from("question_knowledge_suggestions").update({ suggestion_status: decision }).eq("id", suggestionId);
     if (decision === "accepted") {
-      const entry = suggestion.knowledge_entries as unknown as { content_text: string } | null;
+      const entry = suggestion.knowledge_entries as unknown as { content_text: string; content_html: string } | null;
       if (!entry?.content_text) return Response.json({ message: "The suggested answer is no longer available." }, { status: 409 });
-      const { error: updateError } = await supabase.from("questions").update({
+      const answerValues = {
         answer_markdown: entry.content_text,
+        answer_html: entry.content_html,
         answer_source: "knowledge",
         status: "Answered",
         is_answer_public: true,
         answered_at: new Date().toISOString(),
-      }).eq("id", questionId);
+      };
+      let updateResult = await supabase.from("questions").update(answerValues).eq("id", questionId);
+      if (updateResult.error?.code === "42703") {
+        const legacyValues = { answer_markdown: entry.content_text, answer_source: "knowledge", status: "Answered", is_answer_public: true, answered_at: answerValues.answered_at };
+        updateResult = await supabase.from("questions").update(legacyValues).eq("id", questionId);
+      }
+      const updateError = updateResult.error;
       if (updateError) throw updateError;
+    } else {
+      const { error: followUpError } = await supabase.from("questions").update({ status: "Needs follow-up" }).eq("id", questionId);
+      if (followUpError) throw followUpError;
     }
     return Response.json({ message: decision === "accepted" ? "The course answer was accepted and published." : "Your question remains in the instructor queue." });
   } catch (error) {

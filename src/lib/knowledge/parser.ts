@@ -12,6 +12,10 @@ export type ParsedKnowledgeEntry = {
   content_text: string;
   normalized_text: string;
   sequence_number: number;
+  provenance_type?: "section" | "page" | "slide" | "cell" | "line";
+  provenance_label?: string;
+  provenance_start?: number;
+  provenance_end?: number;
 };
 
 const sanitizeOptions: sanitizeHtml.IOptions = {
@@ -22,8 +26,8 @@ const sanitizeOptions: sanitizeHtml.IOptions = {
     img: ["src", "alt", "title", "width", "height", "loading"],
     details: ["open", "class"],
   },
-  allowedSchemes: ["http", "https", "mailto", "data"],
-  allowedSchemesByTag: { img: ["http", "https", "data"] },
+  allowedSchemes: ["http", "https", "mailto", "data", "asset"],
+  allowedSchemesByTag: { img: ["http", "https", "data", "asset"] },
   parser: { lowerCaseAttributeNames: false, lowerCaseTags: false },
   transformTags: {
     a: (_tagName, attribs) => ({ tagName: "a", attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" } }),

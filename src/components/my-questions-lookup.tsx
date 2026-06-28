@@ -1,10 +1,11 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { CalendarDays, Clock3, Layers3, Search } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { CalendarDays, Clock3, Layers3, Link2, Search } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { MarkdownPreview } from "@/components/markdown-preview";
+import { KnowledgeHtml } from "@/components/knowledge-html";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -23,32 +24,36 @@ type LookupState =
 export function MyQuestionsLookup({ accessCode }: { accessCode: string }) {
   const [state, setState] = useState<LookupState>({ status: "idle" });
   const [lookupEmail, setLookupEmail] = useState("");
+  const lookupInFlight = useRef(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setState({ status: "loading" });
-    const studentEmail = new FormData(event.currentTarget).get("student_email");
-    setLookupEmail(typeof studentEmail === "string" ? studentEmail : "");
-
+  const lookup = useCallback(async (studentEmail: FormDataEntryValue | string, silent = false) => {
+    if (lookupInFlight.current) return;
+    lookupInFlight.current = true;
+    if (!silent) setState({ status: "loading" });
     try {
       const response = await fetch("/api/questions/mine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ student_email: studentEmail, access_code: accessCode }),
       });
-      const result = (await response.json()) as Partial<StudentQuestionsResponse> & {
-        message?: string;
-      };
-
-      if (!response.ok) {
-        setState({ status: "error", message: result.message ?? "Unable to find your questions." });
-        return;
-      }
-
+      const result = (await response.json()) as Partial<StudentQuestionsResponse> & { message?: string };
+      if (!response.ok) { if (!silent) setState({ status: "error", message: result.message ?? "Unable to find your questions." }); return; }
       setState({ status: "success", questions: result.questions ?? [] });
-    } catch {
-      setState({ status: "error", message: "Check your connection and try again." });
-    }
+    } catch { if (!silent) setState({ status: "error", message: "Check your connection and try again." }); }
+    finally { lookupInFlight.current = false; }
+  }, [accessCode]);
+
+  useEffect(() => {
+    if (!lookupEmail || state.status !== "success") return;
+    const interval = window.setInterval(() => void lookup(lookupEmail, true), 30_000);
+    return () => window.clearInterval(interval);
+  }, [lookup, lookupEmail, state.status]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const studentEmail = new FormData(event.currentTarget).get("student_email");
+    setLookupEmail(typeof studentEmail === "string" ? studentEmail : "");
+    if (studentEmail) await lookup(studentEmail);
   }
 
   return (
@@ -119,6 +124,7 @@ function QuestionResults({ questions, accessCode, email }: { questions: StudentQ
               <span>{question.course_name}</span>
             </div>
             <h2>{question.question_text}</h2>
+            {question.canonical_question_id && <div className="mine-canonical-notice"><Link2 size={14} /><span><strong>Consolidated with an existing question</strong>{question.canonical_question_text && <small>{question.canonical_question_text}</small>}</span></div>}
             <div className="question-meta">
               <span><Clock3 size={14} /> {format(parseISO(question.created_at), "MMM d, yyyy · h:mm a")}</span>
               {question.class_date && (
@@ -129,9 +135,9 @@ function QuestionResults({ questions, accessCode, email }: { questions: StudentQ
             </div>
             <div className="answer-panel">
               <div className="answer-panel__label">Instructor answer</div>
-              {question.answer_markdown ? (
+              {question.answer_markdown || question.answer_html ? (
                 <>
-                  <MarkdownPreview>{question.answer_markdown}</MarkdownPreview>
+                  {question.answer_html ? <KnowledgeHtml html={question.answer_html} /> : <MarkdownPreview>{question.answer_markdown ?? ""}</MarkdownPreview>}
                   <AnswerFeedback
                     questionId={question.id}
                     email={email}

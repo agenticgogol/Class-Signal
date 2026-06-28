@@ -68,7 +68,56 @@ Protected settings:
 - Model name.
 - API key.
 - Save/update active AI configuration.
+
+### /admin/knowledge
+
+- Manage separate FAQ, Theory and Code repositories.
+- Import HTML, Python, Jupyter Notebook, Markdown and text files without executing uploaded content.
+- Review, order, publish, hide, version and delete knowledge sources.
+- Only visible sections from current document versions participate in public display and similarity matching.
+- Queue PDF, PPTX, ZIP, HTML, Python, notebook, Markdown and text uploads for asynchronous extraction.
+- Store original files and extracted assets privately with checksums and version provenance.
+- Show ingestion progress, warnings and failures without partially publishing a document.
+- Preserve exact page, slide, cell, code-line or section locations in public and AI citations.
+- Reject executable files, unsafe archive paths, nested archives and oversized ZIP expansion.
+- Use an optional external ClamAV-compatible scanner when `CLAMAV_SCAN_URL` is configured.
+- Use optional OpenAI embeddings for hybrid lexical/semantic retrieval only when `OPENAI_EMBEDDING_API_KEY` is configured.
+
+## Course Knowledge Suggestions
+
+- New questions may receive an immediate suggestion from published FAQ, Theory or Code content.
+- Suggestions show source document, section/module, confidence band and a deep link to the cited section.
+- Participant can accept the suggestion or keep the question in the instructor queue.
 - API key must not be exposed to students.
+
+## Knowledge-gap Intelligence
+
+- Cluster related non-duplicate questions using deterministic normalized-token similarity.
+- Explain every recommendation through participant count, sessions, votes, unanswered questions, rejected suggestions, dissatisfaction, follow-up state and existing-source coverage.
+- Recommend FAQ, Theory or Code based on the observed question cluster.
+- Support open, drafting, resolved and dismissed lifecycle states.
+- Allow an instructor to create a hidden draft Course Library entry from a gap.
+
+## Smart Duplicate Consolidation
+
+- A duplicate points to one canonical question while retaining its original author, feedback and history.
+- Canonical vote totals deduplicate normalized participant email across the complete question group.
+- New votes on duplicates are recorded against the canonical question.
+- Duplicate participants inherit the canonical published answer and can submit feedback against their original question.
+- Public duplicates identify and link to the canonical question.
+- Admin merges are transactional, recorded and reversible.
+
+## Post-class Teaching Briefs and QR Joining
+
+- Instructors can activate a QR join link for a course, class date and optional class number.
+- QR URLs contain only a random public session identifier and never contain the class access code.
+- Participants joining through QR must still pass the configured access-code and identity workflow.
+- Questions submitted from a verified active QR link inherit that session’s course, date and class number.
+- Brief generation is deterministic and scoped to one class session.
+- Every generated brief is an immutable version preserving its input metrics and source question IDs.
+- Briefs include unresolved questions, confusing module, satisfaction, follow-up, Course Library recommendations and the next agenda.
+- Instructors can export Markdown or print/save a brief as PDF.
+- Public questions, My Questions and protected admin views refresh automatically while visible.
 
 ## Statuses
 - New

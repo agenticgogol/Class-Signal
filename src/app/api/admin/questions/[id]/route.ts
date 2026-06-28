@@ -31,7 +31,11 @@ export async function PATCH(
     return Response.json({ message: "A question cannot duplicate itself." }, { status: 422 });
   }
 
-  const update = { ...validation.data } as typeof validation.data & { answered_at?: string };
+  const update = { ...validation.data } as typeof validation.data & { answered_at?: string; answer_html?: null; answer_source?: "instructor" };
+  if (Object.prototype.hasOwnProperty.call(validation.data, "answer_markdown")) {
+    update.answer_html = null;
+    update.answer_source = "instructor";
+  }
   if (validation.data.status === "Answered") {
     const { data: existing, error: lookupError } = await supabase
       .from("questions")
@@ -46,12 +50,17 @@ export async function PATCH(
     update.answered_at = existing.answered_at ?? new Date().toISOString();
   }
 
-  const { data, error } = await supabase
+  let result = await supabase
     .from("questions")
     .update(update)
     .eq("id", id)
     .select("id, updated_at")
     .maybeSingle();
+  if (result.error?.code === "42703" && Object.prototype.hasOwnProperty.call(update, "answer_html")) {
+    const legacyUpdate = { ...validation.data, ...(update.answered_at ? { answered_at: update.answered_at } : {}) };
+    result = await supabase.from("questions").update(legacyUpdate).eq("id", id).select("id, updated_at").maybeSingle();
+  }
+  const { data, error } = result;
 
   if (error) {
     console.error("Admin question update failed", { code: error.code, message: error.message, hint: error.hint });
