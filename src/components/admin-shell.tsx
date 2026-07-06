@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, FileText, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, ClipboardList, FileText, GraduationCap, LayoutDashboard, LogOut, MessageSquareText, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { logout } from "@/app/admin/actions";
@@ -24,6 +24,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
           </nav>
           <div className="admin-sidebar__label">Configuration</div>
           <nav aria-label="Admin configuration">
+            <Link href="/admin/classwise-agenda"><ClipboardList size={17} /> Classwise Agenda</Link>
             <Link href="/admin/knowledge"><BookOpen size={17} /> Course Library</Link>
             <Link href="/admin/settings"><Settings size={17} /> Settings</Link>
           </nav>

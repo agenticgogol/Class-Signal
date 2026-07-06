@@ -188,6 +188,35 @@ create table if not exists public.class_join_sessions (
   is_active boolean not null default true, created_by uuid, created_at timestamptz not null default now(), closed_at timestamptz
 );
 
+create table if not exists public.classwise_agenda (
+  id uuid primary key default gen_random_uuid(),
+  course_name text not null,
+  class_number text not null,
+  class_date date,
+  concepts text,
+  hands_on text,
+  is_visible boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(course_name, class_number)
+);
+
+create table if not exists public.answer_assistant_runs (
+  id uuid primary key default gen_random_uuid(),
+  status text not null default 'running' check (status in ('running', 'completed', 'failed')),
+  triggered_by uuid,
+  questions_considered integer not null default 0,
+  drafts_generated integer not null default 0,
+  results jsonb not null default '[]'::jsonb,
+  error_message text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+alter table public.questions add column if not exists is_anonymous boolean not null default false;
+alter table public.questions add column if not exists agenda_entry_id uuid references public.classwise_agenda(id) on delete set null;
+alter table public.questions add column if not exists ai_answer_mode text check (ai_answer_mode in ('course', 'external'));
+
 create table if not exists public.teaching_briefs (
   id uuid primary key default gen_random_uuid(), session_key text not null, course_name text not null,
   class_date date not null, class_number text, version_number integer not null default 1,
@@ -223,6 +252,8 @@ alter table public.knowledge_sources enable row level security;
 alter table public.knowledge_source_versions enable row level security;
 alter table public.ingestion_jobs enable row level security;
 alter table public.knowledge_assets enable row level security;
+alter table public.classwise_agenda enable row level security;
+alter table public.answer_assistant_runs enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger as $$
@@ -347,3 +378,10 @@ create policy "Authenticated admins manage knowledge sources" on public.knowledg
 create policy "Authenticated admins manage knowledge source versions" on public.knowledge_source_versions for all to authenticated using (true) with check (true);
 create policy "Authenticated admins manage ingestion jobs" on public.ingestion_jobs for all to authenticated using (true) with check (true);
 create policy "Authenticated admins manage knowledge assets" on public.knowledge_assets for all to authenticated using (true) with check (true);
+create policy "Authenticated admin manage classwise agenda" on public.classwise_agenda for all to authenticated using (true) with check (true);
+create policy "Authenticated admin manage answer assistant runs" on public.answer_assistant_runs for all to authenticated using (true) with check (true);
+
+drop trigger if exists set_classwise_agenda_updated_at on public.classwise_agenda;
+create trigger set_classwise_agenda_updated_at
+before update on public.classwise_agenda
+for each row execute function public.set_updated_at();

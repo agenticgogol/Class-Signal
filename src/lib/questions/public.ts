@@ -7,9 +7,13 @@ import { resolveKnowledgeAssetUrls } from "@/lib/knowledge/assets";
 type PublicQuestionRow = Omit<PublicQuestion, "upvote_count" | "canonical_question_id" | "canonical_question_text"> & {
   is_answer_public: boolean;
   question_votes: Array<{ count: number }> | null;
+  student_name: string;
+  student_email: string;
 };
 
 // This allowlist is the privacy boundary for every public question response.
+// student_name/student_email are selected only to power server-side search
+// matching below; they are never included in the mapped/returned payload.
 const publicQuestionSelect = `
   id,
   question_text,
@@ -23,14 +27,18 @@ const publicQuestionSelect = `
   answer_source,
   reference_links,
   is_answer_public,
+  is_anonymous,
   duplicate_of_question_id,
   created_at,
+  student_name,
+  student_email,
   question_votes(count)
 `;
 
 export async function getPublicQuestions(
   filters: PublicQuestionFilters = {},
 ): Promise<PublicQuestion[]> {
+  const { search, ...exactFilters } = filters;
   const supabase = createAdminClient();
   const cutoff = (() => {
       const cutoff = new Date();
@@ -39,7 +47,7 @@ export async function getPublicQuestions(
     })();
   async function run(select: string) {
     let query = supabase.from("questions").select(select).eq("is_public", true).gte("created_at", cutoff).order("created_at", { ascending: false });
-    for (const [field, value] of Object.entries(filters)) if (value) query = query.eq(field, value);
+    for (const [field, value] of Object.entries(exactFilters)) if (value) query = query.eq(field, value);
     return await query;
   }
   let result = await run(publicQuestionSelect);
@@ -112,11 +120,30 @@ export async function getPublicQuestions(
           upvote_count: canonicalVoteCount(row.duplicate_of_question_id ?? row.id),
           canonical_question_id: row.duplicate_of_question_id,
           canonical_question_text: row.duplicate_of_question_id ? canonicalById.get(row.duplicate_of_question_id)?.question_text ?? null : null,
+          is_anonymous: Boolean(row.is_anonymous),
       };
     }));
-  return mapped.sort(
+
+  const searched = matchesSearch(mapped, rows, search);
+  return searched.sort(
       (left, right) =>
         right.upvote_count - left.upvote_count ||
         Date.parse(right.created_at) - Date.parse(left.created_at),
     );
+}
+
+// Matches question text/module topic for everyone, and student name/email only
+// for non-anonymous questions. Identity fields never leave this function.
+function matchesSearch(mapped: PublicQuestion[], rows: PublicQuestionRow[], search: string | undefined) {
+  const term = search?.trim().toLocaleLowerCase("en-US");
+  if (!term) return mapped;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  return mapped.filter((question) => {
+    if (question.question_text.toLocaleLowerCase("en-US").includes(term)) return true;
+    if (question.module_topic?.toLocaleLowerCase("en-US").includes(term)) return true;
+    if (question.is_anonymous) return false;
+    const row = rowById.get(question.id);
+    if (!row) return false;
+    return row.student_name?.toLocaleLowerCase("en-US").includes(term) || row.student_email?.toLocaleLowerCase("en-US").includes(term);
+  });
 }

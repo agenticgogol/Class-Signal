@@ -3,6 +3,7 @@ export type PublicQuestionFilters = {
   class_date?: string;
   class_number?: string;
   module_topic?: string;
+  search?: string;
 };
 
 export type PublicQuestion = {
@@ -21,6 +22,7 @@ export type PublicQuestion = {
   upvote_count: number;
   canonical_question_id: string | null;
   canonical_question_text: string | null;
+  is_anonymous: boolean;
 };
 
 export type PublicQuestionsResponse = {

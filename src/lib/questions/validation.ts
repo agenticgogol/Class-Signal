@@ -12,6 +12,7 @@ export type QuestionSubmission = {
   student_email: string;
   module_topic: string;
   question_text: string;
+  is_anonymous: boolean;
 };
 
 export type ValidationResult =
@@ -44,11 +45,14 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
     return { success: false, errors: { form: "Submit a valid question." } };
   }
 
-  const fields = ["student_name", "student_email", "module_topic", "question_text"] as const;
-  const data = {} as QuestionSubmission;
+  const isAnonymous = input.is_anonymous === true;
+  const requiredFields = isAnonymous
+    ? (["module_topic", "question_text"] as const)
+    : (["student_name", "student_email", "module_topic", "question_text"] as const);
+  const data = { is_anonymous: isAnonymous } as QuestionSubmission;
   const errors: Record<string, string> = {};
 
-  for (const field of fields) {
+  for (const field of requiredFields) {
     const value = input[field];
     const label = field.replaceAll("_", " ");
 
@@ -66,8 +70,13 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
     data[field] = trimmed;
   }
 
-  if (data.student_email && !emailPattern.test(data.student_email)) {
+  if (!isAnonymous && data.student_email && !emailPattern.test(data.student_email)) {
     errors.student_email = "Enter a valid email address.";
+  }
+
+  if (isAnonymous) {
+    data.student_name = "Anonymous";
+    data.student_email = `anonymous+${crypto.randomUUID()}@classsignal.local`;
   }
 
   return Object.keys(errors).length > 0

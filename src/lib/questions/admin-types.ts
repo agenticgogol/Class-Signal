@@ -52,6 +52,7 @@ export type AdminQuestion = {
   reference_links: string | null;
   admin_notes: string | null;
   ai_draft_answer: string | null;
+  ai_answer_mode: "course" | "external" | null;
   answer_source: "instructor" | "knowledge";
   is_answer_public: boolean;
   is_public: boolean;

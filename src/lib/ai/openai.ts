@@ -9,6 +9,7 @@ import {
   type DraftAnswerInput,
   type ExternalCitation,
 } from "@/lib/ai/types";
+import { answerModeInstruction } from "@/lib/ai/prompt";
 
 const instructions = `You draft answers for an instructor teaching a live technical course.
 Write a concise, accurate answer in Markdown that the instructor can review and edit.
@@ -86,7 +87,7 @@ async function generateDraftAnswer(input: DraftAnswerInput, settings: AiRuntimeS
       },
       body: JSON.stringify({
         model: settings.modelName,
-        instructions,
+        instructions: `${instructions}\n${answerModeInstruction(input.groundingMode)}`,
         input: JSON.stringify({
           task: "Draft an instructor answer for this course question.",
           course_name: input.courseName,

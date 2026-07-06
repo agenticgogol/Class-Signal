@@ -500,6 +500,18 @@ body:has(.admin-layout) > .site-header, body:has(.admin-layout) > .site-footer {
 .draft-confidence { margin-left: auto; padding: 3px 7px; color: #6b6470; background: #eee9f2; border-radius: 999px; font-size: .54rem; text-transform: capitalize; }
 .draft-confidence--high { color: #176b45; background: #dff3e8; }
 .draft-confidence--low { color: #9a5d16; background: #fff0cf; }
+.draft-mode { margin-left: 8px; padding: 3px 7px; border-radius: 999px; font-size: .54rem; font-weight: 700; }
+.draft-mode--course { color: #176b45; background: #dff3e8; }
+.draft-mode--external { color: #6d4a8c; background: #f0e9f7; }
+
+.answer-assistant { display: grid; gap: 14px; margin-bottom: 26px; padding: 20px 24px; background: white; border: 1px solid var(--line); border-radius: 14px; }
+.answer-assistant__heading span { color: var(--accent); font-size: .6rem; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+.answer-assistant__heading h2 { margin: 4px 0 6px; font-size: 1.1rem; }
+.answer-assistant__heading p { margin: 0; color: var(--muted); font-size: .74rem; max-width: 640px; }
+.answer-assistant__summary { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding-top: 10px; border-top: 1px solid var(--line); }
+.answer-assistant__summary > div { display: flex; align-items: center; gap: 6px; font-size: .74rem; color: var(--muted); }
+.answer-assistant__summary strong { color: var(--ink); font-size: .95rem; }
+.answer-assistant__summary a { margin-left: auto; color: var(--accent); font-size: .72rem; font-weight: 700; }
 .answer-composer__ai > div { max-height: 240px; overflow-y: auto; margin-top: 10px; padding: 11px; color: #4b4252; background: white; border-radius: 6px; font-size: 0.7rem; line-height: 1.55; white-space: pre-wrap; }
 .answer-composer__ai .draft-evidence { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, #e4d9ec); }
 .draft-evidence > strong { display: block; margin-bottom: 7px; color: var(--text, #271f2d); font-size: .63rem; }
@@ -799,7 +811,6 @@ body:has(.admin-layout) > .site-header, body:has(.admin-layout) > .site-footer {
 .llm-warn-dialog__note { margin: 0 0 22px; color: var(--muted); font-size: 0.66rem; line-height: 1.5; }
 .llm-warn-dialog__actions { display: flex; justify-content: flex-end; gap: 9px; }
 
-.public-tabs { grid-template-columns: repeat(4, 1fr); }
 .board-tools { flex-wrap: wrap; }
 .board-tools label select { min-height: 40px; padding: 8px 32px 8px 10px; background: white; border: 1px solid #d2dbd5; border-radius: 7px; }
 .board-reset-button { margin-left: auto; color: #9b3d35 !important; background: #fff4f2 !important; }
@@ -1173,6 +1184,27 @@ body:has(.admin-layout) > .site-header, body:has(.admin-layout) > .site-footer {
 .knowledge-dual-list button span { display: grid; }.knowledge-dual-list button small { margin-top: 2px; color: var(--muted); font-size: .5rem; }.knowledge-library details > summary small { margin-left: 8px; color: var(--muted); font-size: .55rem; font-weight: 600; }
 .knowledge-extraction-preview { border-top: 1px solid var(--line); }.knowledge-extraction-preview > summary { display: flex; align-items: center; gap: 6px; padding: 12px 20px; color: var(--accent); cursor: pointer; font-size: .62rem; font-weight: 700; }.knowledge-extraction-preview > summary svg { width: 14px; }.knowledge-extraction-preview > div { display: grid; gap: 8px; padding: 0 20px 18px; }.knowledge-extraction-preview > div > details { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; }.knowledge-extraction-preview > div > details > summary { display: flex; justify-content: space-between; padding: 9px 11px; cursor: pointer; font-size: .61rem; font-weight: 700; }.knowledge-extraction-preview > div > details > summary small { color: var(--muted); font-size: .52rem; }.knowledge-extraction-preview .knowledge-html { max-height: 420px; overflow: auto; padding: 12px; border-top: 1px solid var(--line); }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.ask-question-modal { position: relative; width: min(720px, 100%); max-height: 90vh; overflow-y: auto; padding: 30px; background: white; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.3); }
+.anonymous-toggle { display: flex !important; align-items: center; gap: 8px; margin-bottom: 14px; font-size: .68rem; font-weight: 700; }
+.anonymous-toggle input { width: 16px; height: 16px; }
+.classwise-agenda__list { display: grid; gap: 16px; padding: 24px; }
+.classwise-agenda__entry { padding: 18px 20px; background: #f7f9f8; border: 1px solid var(--line); border-radius: 10px; }
+.classwise-agenda__entry > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: .7rem; font-weight: 700; color: var(--accent); }
+.classwise-agenda__entry h3 { margin: 12px 0 6px; font-size: .78rem; }
+.classwise-agenda__entry > div:first-of-type h3 { margin-top: 0; }
+
+:root[data-theme="dark"] .ask-question-modal { background: #1c231f; }
+:root[data-theme="dark"] .classwise-agenda__entry { background: #232a26; border-color: #333c36; }
+
+.admin-classwise-agenda .classwise-agenda__list { padding: 0; margin-top: 22px; }
+.admin-classwise-agenda .classwise-agenda__entry header > div { display: flex; gap: 6px; }
+.admin-classwise-agenda .classwise-agenda__entry header button { display: grid; place-items: center; width: 28px; height: 28px; color: var(--muted); background: white; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.admin-classwise-agenda .classwise-agenda__entry header button:hover { color: var(--accent); }
+.admin-agenda-form { display: grid; gap: 14px; margin-top: 18px; }
+.admin-agenda-form label { display: grid; gap: 6px; font-size: .68rem; font-weight: 700; }
+.admin-agenda-form input, .admin-agenda-form textarea { padding: 9px 11px; border: 1px solid #ccd6cf; border-radius: 7px; font: inherit; }
+.admin-agenda-form > div:last-child { display: flex; justify-content: flex-end; gap: 9px; }
 
 @media print {
   body:has(.brief-output) .admin-sidebar,body:has(.brief-output) .teaching-brief-header,body:has(.brief-output) .brief-workspace-grid,body:has(.brief-output) .brief-output > header > div:last-child,body:has(.brief-output) .brief-history { display: none !important; }

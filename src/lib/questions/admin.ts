@@ -16,7 +16,7 @@ type AdminQuestionRow = Omit<AdminQuestion, "upvote_count" | "feedback"> & {
 const adminQuestionSelect = `
   id, student_name, student_email, course_name, class_date, class_number,
   module_topic, question_text, normalized_question_text, status, priority,
-  answer_markdown, reference_links, admin_notes, ai_draft_answer, is_answer_public, is_public,
+  answer_markdown, reference_links, admin_notes, ai_draft_answer, ai_answer_mode, is_answer_public, is_public,
   duplicate_of_question_id, created_at, updated_at, answered_at,
   question_votes(voter_email),
   question_feedback(satisfaction_status, reason, participant_email, created_at, updated_at)
@@ -34,25 +34,29 @@ export async function getAdminQuestions(filters: AdminQuestionFilters): Promise<
   const { data: authData, error: authError } = await supabase.auth.getClaims();
   if (authError || !authData?.claims) throw new Error("Unauthorized admin question request.");
 
-  let query = supabase.from("questions").select(adminQuestionSelect);
-  for (const field of ["course_name", "class_date", "class_number", "module_topic", "status", "priority"] as const) {
-    const value = filters[field];
-    if (value) query = query.eq(field, value);
+  async function run(select: string) {
+    let query = supabase.from("questions").select(select);
+    for (const field of ["course_name", "class_date", "class_number", "module_topic", "status", "priority"] as const) {
+      const value = filters[field];
+      if (value) query = query.eq(field, value);
+    }
+    if (filters.asked_from) query = query.gte("created_at", `${filters.asked_from}T00:00:00.000Z`);
+    if (filters.asked_to) {
+      const exclusiveEnd = new Date(`${filters.asked_to}T00:00:00.000Z`);
+      exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
+      query = query.lt("created_at", exclusiveEnd.toISOString());
+    }
+    return await query;
   }
-  if (filters.asked_from) query = query.gte("created_at", `${filters.asked_from}T00:00:00.000Z`);
-  if (filters.asked_to) {
-    const exclusiveEnd = new Date(`${filters.asked_to}T00:00:00.000Z`);
-    exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
-    query = query.lt("created_at", exclusiveEnd.toISOString());
-  }
-
-  const { data, error } = await query;
+  let result = await run(adminQuestionSelect);
+  if (result.error?.code === "42703") result = await run(adminQuestionSelect.replace("ai_answer_mode, ", ""));
+  const { data, error } = result;
   if (error) {
     console.error("Admin questions query failed", { code: error.code, message: error.message, hint: error.hint });
     throw new Error("Unable to load admin questions.");
   }
 
-  const rows = data as AdminQuestionRow[];
+  const rows = data as unknown as AdminQuestionRow[];
   const membersByCanonical = new Map<string, AdminQuestionRow[]>();
   for (const row of rows) {
     const canonicalId = row.duplicate_of_question_id ?? row.id;
@@ -76,6 +80,7 @@ export async function getAdminQuestions(filters: AdminQuestionFilters): Promise<
     reference_links: row.reference_links,
     admin_notes: row.admin_notes,
     ai_draft_answer: row.ai_draft_answer,
+    ai_answer_mode: row.ai_answer_mode ?? null,
     is_answer_public: row.is_answer_public,
     is_public: row.is_public,
     duplicate_of_question_id: row.duplicate_of_question_id,

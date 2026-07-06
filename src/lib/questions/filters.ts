@@ -12,6 +12,7 @@ const filterLimits = {
   class_date: 10,
   class_number: questionLimits.class_number,
   module_topic: questionLimits.module_topic,
+  search: 200,
 } as const;
 
 export function validatePublicQuestionFilters(input: SearchValues): FilterResult {

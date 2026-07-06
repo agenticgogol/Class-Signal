@@ -17,6 +17,7 @@ type SubmitState =
 
 export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }: { accessCode: string; publicSessionId?: string | null; onSubmitted?: () => void }) {
   const [state, setState] = useState<SubmitState>({ status: "idle" });
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const errors = state.status === "error" ? state.errors : {};
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -24,7 +25,8 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
     setState({ status: "submitting" });
 
     const form = event.currentTarget;
-    const payload: Record<string, FormDataEntryValue | string> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode };
+    const payload: Record<string, FormDataEntryValue | string | boolean> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode, is_anonymous: isAnonymous };
+    if (isAnonymous) { delete payload.student_name; delete payload.student_email; }
     if (publicSessionId) payload.public_session_id = publicSessionId;
 
     try {
@@ -88,8 +90,10 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
           <h3>{state.suggestion.title}</h3>
           <div className="knowledge-citation"><span><strong>Source</strong>{state.suggestion.document_title}{state.suggestion.provenance_label ? ` · ${state.suggestion.provenance_label}` : ""}{state.suggestion.module_topic ? ` · ${state.suggestion.module_topic}` : ""}</span><a href={`/questions?section=knowledge&kind=${state.suggestion.kind}#knowledge-entry-${state.suggestion.entry_id}`}><ExternalLink size={14} /> Open cited section</a></div>
           <KnowledgeHtml html={state.suggestion.content_html} />
-          <p>Does this answer your question?</p>
-          <div><Button disabled={state.responding} onClick={() => void respondToSuggestion("accepted")}><ThumbsUp size={15} /> Yes, this answers it</Button><Button disabled={state.responding} variant="secondary" onClick={() => void respondToSuggestion("rejected")}><ThumbsDown size={15} /> I still need the instructor</Button></div>
+          {state.email && <>
+            <p>Does this answer your question?</p>
+            <div><Button disabled={state.responding} onClick={() => void respondToSuggestion("accepted")}><ThumbsUp size={15} /> Yes, this answers it</Button><Button disabled={state.responding} variant="secondary" onClick={() => void respondToSuggestion("rejected")}><ThumbsDown size={15} /> I still need the instructor</Button></div>
+          </>}
         </section>}
         {state.response && <p className="form-alert" role="status">{state.response}</p>}
         <div className="success-panel__actions">
@@ -112,8 +116,12 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             <p>Your details are visible only to the instructor.</p>
           </div>
         </div>
-        <div className="form-grid form-grid--three">
-          <FormField
+        <label className="anonymous-toggle">
+          <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
+          Post anonymously (skip name and email)
+        </label>
+        <div className={isAnonymous ? "form-grid" : "form-grid form-grid--three"}>
+          {!isAnonymous && <FormField
             id="student_name"
             name="student_name"
             label="Your name"
@@ -122,8 +130,8 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             placeholder="e.g. Maya Chen"
             required
             error={errors.student_name}
-          />
-          <FormField
+          />}
+          {!isAnonymous && <FormField
             id="student_email"
             name="student_email"
             label="Email address"
@@ -134,7 +142,7 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             placeholder="maya@example.com"
             required
             error={errors.student_email}
-          />
+          />}
           <FormField
             id="module_topic"
             name="module_topic"

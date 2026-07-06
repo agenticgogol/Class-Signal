@@ -20,6 +20,7 @@ import {
   type DraftAnswerInput,
   type ExternalCitation,
 } from "@/lib/ai/types";
+import { answerModeInstruction } from "@/lib/ai/prompt";
 
 const systemPrompt = `You draft answers for an instructor teaching a live technical course.
 Write a concise, accurate answer in Markdown that the instructor can review and edit.
@@ -75,7 +76,7 @@ async function generateDraftAnswer(input: DraftAnswerInput, settings: AiRuntimeS
     const message = await client.messages.create({
       model: settings.modelName,
       max_tokens: 1200,
-      system: systemPrompt,
+      system: `${systemPrompt}\n${answerModeInstruction(input.groundingMode)}`,
       messages: [{
         role: "user",
         content: JSON.stringify({
