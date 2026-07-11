@@ -13,6 +13,7 @@ export type QuestionSubmission = {
   module_topic: string;
   question_text: string;
   is_anonymous: boolean;
+  is_public: boolean;
 };
 
 export type ValidationResult =
@@ -46,8 +47,9 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
   }
 
   const isAnonymous = input.is_anonymous === true;
+  const isPrivate = input.is_private === true;
   const requiredFields = ["question_text"] as const;
-  const data = { is_anonymous: isAnonymous, module_topic: "" } as QuestionSubmission;
+  const data = { is_anonymous: isAnonymous, is_public: !isPrivate, module_topic: "" } as QuestionSubmission;
   const errors: Record<string, string> = {};
 
   for (const field of requiredFields) {

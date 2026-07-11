@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CheckCircle2, ExternalLink, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import { BookOpen, CheckCircle2, ExternalLink, Lock, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ type SubmitState =
 export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }: { accessCode: string; publicSessionId?: string | null; onSubmitted?: () => void }) {
   const [state, setState] = useState<SubmitState>({ status: "idle" });
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const errors = state.status === "error" ? state.errors : {};
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -25,7 +26,7 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
     setState({ status: "submitting" });
 
     const form = event.currentTarget;
-    const payload: Record<string, FormDataEntryValue | string | boolean> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode, is_anonymous: isAnonymous };
+    const payload: Record<string, FormDataEntryValue | string | boolean> = { ...Object.fromEntries(new FormData(form).entries()), access_code: accessCode, is_anonymous: isAnonymous, is_private: isPrivate };
     if (isAnonymous) { delete payload.student_name; delete payload.student_email; }
     if (publicSessionId) payload.public_session_id = publicSessionId;
 
@@ -108,10 +109,16 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
 
   return (
     <form className="question-form question-form--compact" onSubmit={handleSubmit} noValidate aria-busy={state.status === "submitting"}>
-      <label className="anonymous-toggle">
-        <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
-        Post anonymously (skip name and email)
-      </label>
+      <div className="form-toggles">
+        <label className="anonymous-toggle">
+          <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
+          Post anonymously (skip name and email)
+        </label>
+        <label className="anonymous-toggle private-toggle">
+          <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} />
+          <Lock size={12} aria-hidden="true" /> Ask privately (instructor only)
+        </label>
+      </div>
 
       {!isAnonymous && (
         <div className="form-grid">
@@ -157,7 +164,7 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
       )}
 
       <div className="form-actions">
-        <p>By submitting, you agree that your question may appear publicly without your name or email.</p>
+        <p>{isPrivate ? "This question will only be visible to the instructor, never on the public board." : "By submitting, you agree that your question may appear publicly without your name or email."}</p>
         <Button type="submit" disabled={state.status === "submitting"}>
           {state.status === "submitting" ? "Submitting…" : "Submit question"}
           {state.status !== "submitting" && <Send size={17} aria-hidden="true" />}
