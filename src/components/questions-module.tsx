@@ -1,8 +1,9 @@
 "use client";
 
-import { BookOpen, CalendarDays, ClipboardList, KeyRound, MessageCircleQuestion, Plus, RotateCcw, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { BookOpen, Bot, CalendarDays, ClipboardList, KeyRound, MessageCircleQuestion, Plus, RotateCcw, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
+import { AskAiDirect } from "@/components/ask-ai-direct";
 import { MyQuestionsLookup } from "@/components/my-questions-lookup";
 import { KnowledgeHtml } from "@/components/knowledge-html";
 import { MarkdownPreview } from "@/components/markdown-preview";
@@ -32,6 +33,8 @@ export function QuestionsModule() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("upvotes");
   const [showAsk, setShowAsk] = useState(false);
+  const [showAskAi, setShowAskAi] = useState(false);
+  const [askAiPrefill, setAskAiPrefill] = useState("");
   const [showMyQuestions, setShowMyQuestions] = useState(false);
   const [agenda, setAgenda] = useState<PublicClasswiseAgendaEntry[]>([]);
   const [agendaState, setAgendaState] = useState<{ loading: boolean; error?: string }>({ loading: false });
@@ -240,7 +243,7 @@ export function QuestionsModule() {
     <div className="board-page">
       <section className="board-hero shell">
         <div><div className="eyebrow"><span /> ClassSignal live board</div><h1>Every question, clearly tracked.</h1><p>Ask, upvote, and follow instructor answers for {publicSession?.course_name ?? access.default_course_name}. Showing the last three months.</p>{publicSession && <div className="session-join-banner"><CalendarDays size={16} /><span><strong>Active class session</strong>{publicSession.class_date}{publicSession.class_number ? ` · Class ${publicSession.class_number}` : ""}</span></div>}</div>
-        <div className="board-access-actions"><span><ShieldCheck size={14} /> Access verified</span>{access.submissions_enabled && <Button onClick={() => setShowAsk(true)}><Plus size={16} /> Ask a question</Button>}</div>
+        <div className="board-access-actions"><span><ShieldCheck size={14} /> Access verified</span>{access.submissions_enabled && <Button onClick={() => setShowAsk(true)}><Plus size={16} /> Ask a question</Button>}<Button variant="secondary" onClick={() => { setAskAiPrefill(""); setShowAskAi(true); }}><Bot size={16} /> Ask AI directly</Button></div>
       </section>
       <nav className="public-tabs shell" aria-label="Public board sections" role="tablist">
         <button type="button" role="tab" aria-selected={activeTab === "all"} className={activeTab === "all" ? "is-active" : ""} onClick={() => setActiveTab("all")}><MessageCircleQuestion size={16} /> All Questions</button>
@@ -271,7 +274,7 @@ export function QuestionsModule() {
         <section className="shell board-content" role="tabpanel" aria-label="All Questions">
           <div className="board-content__heading"><div><strong>{filteredQuestions.length}</strong> public {filteredQuestions.length === 1 ? "question" : "questions"}</div><span>{sortOption === "newest" ? "Newest first" : sortOption === "oldest" ? "Oldest first" : "Upvotes first, then newest"}</span></div>
           {boardState.error && <p className="board-notice" role="alert">{boardState.error}</p>}
-          {boardState.loading ? <div className="skeleton board-list-skeleton" /> : <PublicQuestionBoard questions={filteredQuestions} accessCode={accessCode} votingEnabled={access.voting_enabled} />}
+          {boardState.loading ? <div className="skeleton board-list-skeleton" /> : <PublicQuestionBoard questions={filteredQuestions} accessCode={accessCode} votingEnabled={access.voting_enabled} onAskAi={(questionText) => { setAskAiPrefill(questionText); setShowAskAi(true); }} />}
         </section>
       </>}
 
@@ -300,6 +303,8 @@ export function QuestionsModule() {
       </section>}
 
       {showAsk && <div className="modal-backdrop" role="presentation"><section className="ask-question-modal" role="dialog" aria-modal="true" aria-labelledby="ask-question-title"><button className="reset-board-modal__close" onClick={() => setShowAsk(false)} aria-label="Close"><X /></button><div className="public-tab-panel__heading"><div className="eyebrow"><span /> Submit to the instructor</div><h2 id="ask-question-title">Ask a question</h2><p>Your identity stays private on the public board.</p></div><QuestionSubmitForm accessCode={accessCode} publicSessionId={publicSessionId} onSubmitted={() => { setShowAsk(false); setActiveTab("all"); void loadQuestions(accessCode, false, searchTerm); }} /></section></div>}
+
+      {showAskAi && <div className="modal-backdrop" role="presentation"><section className="ask-question-modal" role="dialog" aria-modal="true" aria-labelledby="ask-ai-title"><button className="reset-board-modal__close" onClick={() => setShowAskAi(false)} aria-label="Close"><X /></button><div className="public-tab-panel__heading"><div className="eyebrow"><span /> Bring your own LLM</div><h2 id="ask-ai-title">Ask AI directly</h2></div><AskAiDirect key={askAiPrefill} accessCode={accessCode} initialQuestion={askAiPrefill} /></section></div>}
 
       {showReset && <div className="modal-backdrop" role="presentation"><section className="reset-board-modal" role="dialog" aria-modal="true" aria-labelledby="reset-title"><button className="reset-board-modal__close" onClick={() => setShowReset(false)} aria-label="Close"><X /></button><div className="reset-board-modal__icon"><Trash2 /></div><h2 id="reset-title">Reset public board</h2><p>This archives every currently public question. Questions remain available to the admin and can be restored individually.</p><form onSubmit={resetPublicBoard}><label>Admin email<input name="email" type="email" autoComplete="username" required /></label><label>Admin password<input name="password" type="password" autoComplete="current-password" required /></label><label>Type <strong>RESET PUBLIC BOARD</strong><input name="confirmation" required /></label>{resetState.error && <p className="form-alert">{resetState.error}</p>}<div><Button type="button" variant="secondary" onClick={() => setShowReset(false)}>Cancel</Button><Button type="submit" disabled={resetState.loading}>{resetState.loading ? "Verifying…" : "Archive public questions"}</Button></div></form></section></div>}
     </div>

@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { CalendarDays, CheckCircle2, ChevronDown, Clock3, Layers3, Link2 } from "lucide-react";
+import { Bot, CalendarDays, CheckCircle2, ChevronDown, Clock3, Layers3, Link2 } from "lucide-react";
 
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { KnowledgeHtml } from "@/components/knowledge-html";
@@ -11,10 +11,12 @@ export function PublicQuestionBoard({
   questions,
   accessCode,
   votingEnabled,
+  onAskAi,
 }: {
   questions: PublicQuestion[];
   accessCode: string;
   votingEnabled: boolean;
+  onAskAi?: (questionText: string) => void;
 }) {
   if (questions.length === 0) {
     return (
@@ -57,6 +59,11 @@ export function PublicQuestionBoard({
               {votingEnabled
                 ? <UpvoteButton questionId={question.canonical_question_id ?? question.id} initialCount={question.upvote_count} accessCode={accessCode} />
                 : <span className="voting-disabled">Voting is disabled</span>}
+              {onAskAi && (
+                <button type="button" className="ask-ai-inline-button" onClick={() => onAskAi(question.question_text)}>
+                  <Bot size={13} aria-hidden="true" /> Ask AI about this
+                </button>
+              )}
             </div>
             {question.answer_markdown || question.answer_html ? (
               <details className="public-answer">
