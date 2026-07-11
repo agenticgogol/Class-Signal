@@ -107,22 +107,15 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
   }
 
   return (
-    <form className="question-form" onSubmit={handleSubmit} noValidate aria-busy={state.status === "submitting"}>
-      <div className="form-section">
-        <div className="form-section__heading">
-          <span>01</span>
-          <div>
-            <h2>About you</h2>
-            <p>Your details are visible only to the instructor.</p>
-          </div>
-        </div>
-        <label className="anonymous-toggle">
-          <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
-          Post anonymously (skip name and email)
-        </label>
-        {!isAnonymous && <p className="form-hint">Enter your name, email, or both.</p>}
+    <form className="question-form question-form--compact" onSubmit={handleSubmit} noValidate aria-busy={state.status === "submitting"}>
+      <label className="anonymous-toggle">
+        <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
+        Post anonymously (skip name and email)
+      </label>
+
+      {!isAnonymous && (
         <div className="form-grid">
-          {!isAnonymous && <FormField
+          <FormField
             id="student_name"
             name="student_name"
             label="Your name"
@@ -130,8 +123,8 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             maxLength={questionLimits.student_name}
             placeholder="e.g. Maya Chen"
             error={errors.student_name}
-          />}
-          {!isAnonymous && <FormField
+          />
+          <FormField
             id="student_email"
             name="student_email"
             label="Email address"
@@ -140,43 +133,24 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             autoComplete="email"
             maxLength={questionLimits.student_email}
             placeholder="maya@example.com"
+            hint="Enter your name, email, or both."
             error={errors.student_email}
-          />}
-          <FormField
-            id="module_topic"
-            name="module_topic"
-            label="Module name"
-            maxLength={questionLimits.module_topic}
-            placeholder="RAG and vector search"
-            required
-            error={errors.module_topic}
           />
         </div>
-      </div>
+      )}
 
-      <div className="form-section">
-        <div className="form-section__heading">
-          <span>02</span>
-          <div>
-            <h2>Your question</h2>
-            <p>Include the specific concept, code, or error you want explained.</p>
-          </div>
-        </div>
-        <div className="form-grid">
-          <FormField
-            id="question_text"
-            name="question_text"
-            label="Question"
-            multiline
-            rows={6}
-            maxLength={questionLimits.question_text}
-            placeholder="What would you like the instructor to clarify?"
-            hint={`Up to ${questionLimits.question_text.toLocaleString()} characters.`}
-            required
-            error={errors.question_text}
-          />
-        </div>
-      </div>
+      <FormField
+        id="question_text"
+        name="question_text"
+        label="Your question"
+        multiline
+        rows={5}
+        maxLength={questionLimits.question_text}
+        placeholder="What would you like the instructor to clarify? Include the specific concept, code, or error."
+        hint={`Up to ${questionLimits.question_text.toLocaleString()} characters.`}
+        required
+        error={errors.question_text}
+      />
 
       {state.status === "error" && (
         <p className="form-alert" role="alert">{state.message}</p>

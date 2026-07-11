@@ -46,8 +46,8 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
   }
 
   const isAnonymous = input.is_anonymous === true;
-  const requiredFields = ["module_topic", "question_text"] as const;
-  const data = { is_anonymous: isAnonymous } as QuestionSubmission;
+  const requiredFields = ["question_text"] as const;
+  const data = { is_anonymous: isAnonymous, module_topic: "" } as QuestionSubmission;
   const errors: Record<string, string> = {};
 
   for (const field of requiredFields) {
@@ -66,6 +66,16 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
     }
 
     data[field] = trimmed;
+  }
+
+  const moduleTopicValue = input.module_topic;
+  if (typeof moduleTopicValue === "string" && moduleTopicValue.trim().length > 0) {
+    const trimmed = moduleTopicValue.trim();
+    if (trimmed.length > questionLimits.module_topic) {
+      errors.module_topic = `module topic must be ${questionLimits.module_topic} characters or fewer.`;
+    } else {
+      data.module_topic = trimmed;
+    }
   }
 
   if (!isAnonymous) {
