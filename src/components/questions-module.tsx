@@ -250,13 +250,19 @@ export function QuestionsModule() {
 
       {activeTab === "all" && <>
         <section className="shell board-tools">
-          <label>Search questions<input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Topic, name, or email" /></label>
-          <label>Filter by module<input value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} placeholder="Search module name" /></label>
-          <label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option><option>New</option><option>Answered</option><option>Explained verbally</option><option value="Will discuss later">Will be discussed later</option><option value="Out of scope">Out of course scope</option><option>Needs follow-up</option></select></label>
-          <label>Sort by<select value={sortOption} onChange={(event) => setSortOption(event.target.value as SortOption)}><option value="upvotes">Most upvoted</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
-          <button type="button" onClick={() => { setModuleFilter(""); setStatusFilter(""); setSearchTerm(""); setSortOption("upvotes"); }}><RotateCcw size={14} /> Clear filters</button>
-          <button type="button" onClick={() => setShowMyQuestions((current) => !current)}><Search size={14} /> {showMyQuestions ? "Hide my questions" : "Find my questions"}</button>
-          <button className="board-reset-button" type="button" onClick={() => setShowReset(true)}><Trash2 size={14} /> Reset public board</button>
+          <div className="board-tools__fields">
+            <label>Search questions<input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Topic, name, or email" /></label>
+            <label>Filter by module<input value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} placeholder="Search module name" /></label>
+            <label>Filter by status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option><option>New</option><option>Answered</option><option>Explained verbally</option><option value="Will discuss later">Will be discussed later</option><option value="Out of scope">Out of course scope</option><option>Needs follow-up</option></select></label>
+            <label>Sort by<select value={sortOption} onChange={(event) => setSortOption(event.target.value as SortOption)}><option value="upvotes">Most upvoted</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+          </div>
+          <div className="board-tools__actions">
+            <div className="board-tools__actions-group">
+              <button type="button" onClick={() => { setModuleFilter(""); setStatusFilter(""); setSearchTerm(""); setSortOption("upvotes"); }}><RotateCcw size={14} /> Clear filters</button>
+              <button type="button" onClick={() => setShowMyQuestions((current) => !current)}><Search size={14} /> {showMyQuestions ? "Hide my questions" : "Find my questions"}</button>
+            </div>
+            <button className="board-reset-button" type="button" onClick={() => setShowReset(true)}><Trash2 size={14} /> Reset public board</button>
+          </div>
         </section>
         {showMyQuestions && <section className="shell public-tab-panel public-tab-panel--mine">
           <div className="public-tab-panel__heading"><div className="eyebrow"><span /> Your submissions</div><h2>My Questions</h2><p>Use the exact email address entered with your question. Anonymous questions cannot be looked up this way.</p></div>

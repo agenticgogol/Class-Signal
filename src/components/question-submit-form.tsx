@@ -120,7 +120,8 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
           <input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} />
           Post anonymously (skip name and email)
         </label>
-        <div className={isAnonymous ? "form-grid" : "form-grid form-grid--three"}>
+        {!isAnonymous && <p className="form-hint">Enter your name, email, or both.</p>}
+        <div className="form-grid">
           {!isAnonymous && <FormField
             id="student_name"
             name="student_name"
@@ -128,7 +129,6 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             autoComplete="name"
             maxLength={questionLimits.student_name}
             placeholder="e.g. Maya Chen"
-            required
             error={errors.student_name}
           />}
           {!isAnonymous && <FormField
@@ -140,7 +140,6 @@ export function QuestionSubmitForm({ accessCode, publicSessionId, onSubmitted }:
             autoComplete="email"
             maxLength={questionLimits.student_email}
             placeholder="maya@example.com"
-            required
             error={errors.student_email}
           />}
           <FormField

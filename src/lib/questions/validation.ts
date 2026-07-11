@@ -46,9 +46,7 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
   }
 
   const isAnonymous = input.is_anonymous === true;
-  const requiredFields = isAnonymous
-    ? (["module_topic", "question_text"] as const)
-    : (["student_name", "student_email", "module_topic", "question_text"] as const);
+  const requiredFields = ["module_topic", "question_text"] as const;
   const data = { is_anonymous: isAnonymous } as QuestionSubmission;
   const errors: Record<string, string> = {};
 
@@ -70,13 +68,36 @@ export function validateQuestionSubmission(input: unknown): ValidationResult {
     data[field] = trimmed;
   }
 
-  if (!isAnonymous && data.student_email && !emailPattern.test(data.student_email)) {
-    errors.student_email = "Enter a valid email address.";
+  if (!isAnonymous) {
+    const optionalFields = ["student_name", "student_email"] as const;
+    for (const field of optionalFields) {
+      const value = input[field];
+      if (typeof value !== "string" || value.trim().length === 0) continue;
+
+      const trimmed = value.trim();
+      const label = field.replaceAll("_", " ");
+      if (trimmed.length > questionLimits[field]) {
+        errors[field] = `${label} must be ${questionLimits[field]} characters or fewer.`;
+        continue;
+      }
+      data[field] = trimmed;
+    }
+
+    if (!data.student_name && !data.student_email) {
+      errors.student_name = "Enter your name, email, or both.";
+    }
+
+    if (data.student_email && !emailPattern.test(data.student_email)) {
+      errors.student_email = "Enter a valid email address.";
+    }
   }
 
   if (isAnonymous) {
     data.student_name = "Anonymous";
     data.student_email = `anonymous+${crypto.randomUUID()}@classsignal.local`;
+  } else {
+    data.student_name = data.student_name ?? "";
+    data.student_email = data.student_email ?? "";
   }
 
   return Object.keys(errors).length > 0
