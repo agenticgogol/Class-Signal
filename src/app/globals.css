@@ -473,7 +473,7 @@ body:has(.admin-layout) > .site-header, body:has(.admin-layout) > .site-footer {
 .answer-queue__empty { display: grid; place-items: center; gap: 6px; padding: 55px 20px; color: var(--accent); text-align: center; }
 .answer-queue__empty strong { color: var(--ink); font-size: 0.76rem; }
 .answer-queue__empty span { color: var(--muted); font-size: 0.63rem; }
-.answer-compose { min-width: 0; overflow-y: auto; }
+.answer-compose { min-width: 0; min-height: 0; overflow-y: auto; }
 .answer-composer { padding: 25px 28px 30px; }
 .answer-composer__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
 .answer-composer__header > div > div { display: flex; gap: 7px; }
